@@ -1,0 +1,67 @@
+---
+id: "02"
+slug: "installation"
+title: "Installation"
+description: "Install OpenClaw Gateway using the official installer or npm"
+tier: "free"
+level: 1
+estimatedTime: "15 min"
+---
+
+# Installation
+
+There are two ways to install. I recommend Option 1.
+
+## Option 1: Official Installer (Recommended)
+
+This is the fastest, most reliable method:
+
+```bash
+curl -fsSL https://openclaw.bot/install.sh | bash
+```
+
+**What this does:**
+- Downloads OpenClaw CLI
+- Installs it globally
+- Sets up basic directories
+
+## Option 2: npm Install (Alternative)
+
+If you prefer npm:
+
+```bash
+npm install -g openclaw@latest
+```
+
+**Or with pnpm:**
+```bash
+pnpm add -g openclaw@latest
+```
+
+## Verify Installation
+
+Check that it worked:
+
+```bash
+openclaw --version
+```
+
+You should see something like: `openclaw/2.4.0`
+
+## Common Installation Errors
+
+### Error: "command not found"
+- Fix: Close and reopen your terminal
+- Or run: `source ~/.bashrc` (or `~/.zshrc`)
+
+### Error: "permission denied"
+- Fix: You might need `sudo` for the installer
+- Or use the npm method instead
+
+### Error: "node version too old"
+- Fix: Update Node.js to version 22+
+- Check: `node --version`
+
+## Next Step
+
+Once installed, we need to configure it. Continue to Module 3.

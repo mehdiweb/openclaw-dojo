@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+/* Authentic SoloLaunches Design Tokens */
+:root {
+  /* Background colors */
+  --background: #FFFDF7;
+  /* Cream / Pale Yellow */
+  --bg-card: #FFFFFF;
+  --bg-secondary: #F3F4F6;
+
+  /* Brand / Accent */
+  --primary: #FFD54F;
+  /* Sunny Yellow */
+  --primary-hover: #FFCA28;
+  --accent-purple: #C084FC;
+  /* Pastel Purple for badges/cards */
+  --accent-blue: #93C5FD;
+  /* Pastel Blue */
+  --accent-green: #86EFAC;
+  /* Pastel Green */
+  --accent-pink: #F9A8D4;
+  /* Pastel Pink */
+
+  /* Text colors */
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #9CA3AF;
+
+  /* Borders */
+  --border-strong: #1F2937;
+  /* Dark border for "neobrutalism" feel */
+  --border-subtle: #E5E7EB;
+
+  /* Shadows */
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-hard: 3px 3px 0px 0px rgba(0, 0, 0, 1);
+  /* Hard shadow for buttons/cards if needed */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-bg-card: var(--bg-card);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-border-strong: var(--border-strong);
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Base Styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Specific SoloLaunches Button Style */
+.btn-primary {
+  background-color: var(--primary);
+  color: #000;
+  font-weight: 700;
+  border: 2px solid #000;
+  box-shadow: 2px 2px 0px 0px #000;
+  transition: all 0.1s ease;
+}
+
+.btn-primary:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px 0px #000;
+}
+
+.btn-primary:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0px 0px #000;
+}
+
+.card-base {
+  background: white;
+  border: 2px solid #000;
+  border-radius: 0.75rem;
+  box-shadow: 3px 3px 0px 0px rgba(0, 0, 0, 0.1);
+  /* Slightly softer than hard black */
+}

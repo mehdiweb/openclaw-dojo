@@ -1,0 +1,119 @@
+---
+id: "03"
+slug: "first-time-setup"
+title: "First-Time Setup"
+description: "Run the onboarding wizard and configure authentication"
+tier: "free"
+level: 1
+estimatedTime: "20 min"
+---
+
+# First-Time Setup
+
+OpenClaw has a built-in wizard that walks you through initial setup. This is the easiest way to configure everything.
+
+## Start the Wizard
+
+```bash
+openclaw onboard --install-daemon
+```
+
+**What the wizard does:**
+1. Sets up authentication (API keys)
+2. Configures gateway settings
+3. Sets up communication channels
+4. Installs background service (so it stays running)
+5. Creates your workspace
+
+## What You'll Configure
+
+### Step 1: Local vs Remote Gateway
+- **Local:** Running on this machine (what we're doing)
+- **Remote:** Running on another server
+
+Choose: **Local**
+
+### Step 2: Authentication (Choose One)
+
+**Option A: Anthropic API Key (Recommended)**
+- Get one: https://console.anthropic.com
+- Cost: ~$5-15/month for light use
+- Best performance for coding tasks
+
+**Option B: OpenAI API Key**
+- Get one: https://platform.openai.com
+- Cost: ~$5-20/month
+- Good alternative
+
+**Option C: OAuth (if you have Claude Code)**
+- Reuse existing Claude credentials
+- Run: `claude setup-token` first
+
+Enter your API key when prompted. The wizard stores it securely.
+
+### Step 3: Gateway Token (Security)
+
+The wizard generates a token automatically. **Save this somewhere safe.**
+
+You'll need it to access the web dashboard remotely.
+
+### Step 4: Background Service
+
+The wizard asks about installing a service. Say **YES**.
+
+This means OpenClaw will:
+- Start automatically when your server boots
+- Restart if it crashes
+- Run in the background (no need to keep terminal open)
+
+## What Gets Installed
+
+After the wizard completes, you have:
+
+```
+~/.openclaw/
+├── openclaw.json          # Main config
+├── credentials/           # API keys and auth
+├── workspace/            # Your AI workspace
+└── logs/                 # Log files
+```
+
+## Verify the Gateway is Running
+
+```bash
+openclaw gateway status
+```
+
+Should show: `running`
+
+If not:
+```bash
+openclaw gateway
+```
+
+## Access the Dashboard
+
+Open your browser:
+```
+http://127.0.0.1:18789/
+```
+
+If you see the Control UI, you're good! If it asks for a token, paste the one from the wizard.
+
+## Common Wizard Errors
+
+**"No auth configured"**
+- You skipped the API key step
+- Re-run: `openclaw onboard`
+
+**"Gateway already running"**
+- It's already working!
+- Check: `openclaw status`
+
+**"Permission denied" (service install)**
+- Normal on some systems
+- The wizard will give you manual instructions
+
+## Next Step
+
+Now let's connect WhatsApp or Telegram. Continue to Module 4 or 5.

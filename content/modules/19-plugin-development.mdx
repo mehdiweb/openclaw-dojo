@@ -1,0 +1,516 @@
+---
+id: "19"
+slug: "plugin-development"
+title: "Plugin Development"
+description: "Create reusable plugins and extensions"
+tier: "architect"
+level: 4
+estimatedTime: "120 min"
+---
+
+# Plugin Development
+
+🏗️ **Architect Tier Module** - [Upgrade to access](/support)
+
+Create reusable plugins that extend OpenClaw's capabilities. Package your custom tools, workflows, and integrations for distribution and reuse.
+
+## What You'll Learn
+
+- ✅ Understand the plugin architecture
+- ✅ Create NPM packages for plugins
+- ✅ Implement plugin lifecycle hooks
+- ✅ Manage plugin versioning and dependencies
+- ✅ Real example: Custom analytics plugin
+
+## Prerequisites
+
+Complete Modules 15 and 18 (Custom Tools and Multi-Agent Systems) before starting this module.
+
+---
+
+## Step 1: Plugin Architecture
+
+### Plugin Structure
+
+```
+my-openclaw-plugin/
+├── package.json
+├── README.md
+├── src/
+│   ├── index.js          # Main entry point
+│   ├── tools/            # Custom tools
+│   ├── workflows/        # Workflow templates
+│   └── config/           # Default configuration
+├── tests/
+│   └── index.test.js
+└── docs/
+    └── usage.md
+```
+
+### Create Plugin Scaffold
+
+```bash
+mkdir my-openclaw-plugin
+cd my-openclaw-plugin
+npm init -y
+```
+
+### Package.json
+
+```json
+{
+  "name": "@openclaw/analytics-plugin",
+  "version": "1.0.0",
+  "description": "Analytics and reporting plugin for OpenClaw",
+  "main": "src/index.js",
+  "keywords": ["openclaw", "plugin", "analytics"],
+  "author": "Your Name",
+  "license": "MIT",
+  "peerDependencies": {
+    "openclaw": "^2.0.0"
+  },
+  "dependencies": {
+    "chart.js": "^4.0.0",
+    "date-fns": "^2.30.0"
+  },
+  "openclaw": {
+    "type": "plugin",
+    "version": "2.0",
+    "capabilities": [
+      "tools",
+      "workflows",
+      "ui"
+    ]
+  }
+}
+```
+
+---
+
+## Step 2: Implement Plugin Entry Point
+
+### Main Plugin File
+
+```javascript
+// src/index.js
+class AnalyticsPlugin {
+  constructor(openclaw) {
+    this.openclaw = openclaw;
+    this.config = {};
+  }
+  
+  // Lifecycle: Called when plugin is loaded
+  async onLoad(config) {
+    this.config = { ...this.defaultConfig(), ...config };
+    console.log('Analytics plugin loaded');
+  }
+  
+  // Lifecycle: Called when plugin is enabled
+  async onEnable() {
+    // Register tools
+    await this.registerTools();
+    
+    // Register workflows
+    await this.registerWorkflows();
+    
+    // Start background tasks
+    await this.startCollector();
+    
+    console.log('Analytics plugin enabled');
+  }
+  
+  // Lifecycle: Called when plugin is disabled
+  async onDisable() {
+    await this.stopCollector();
+    console.log('Analytics plugin disabled');
+  }
+  
+  // Lifecycle: Called when plugin is unloaded
+  async onUnload() {
+    // Cleanup resources
+    console.log('Analytics plugin unloaded');
+  }
+  
+  defaultConfig() {
+    return {
+      collectInterval: 60000,  // 1 minute
+      retentionDays: 30,
+      metrics: ['messages', 'users', 'errors']
+    };
+  }
+  
+  async registerTools() {
+    const tools = [
+      require('./tools/get-stats'),
+      require('./tools/generate-report')
+    ];
+    
+    for (const tool of tools) {
+      await this.openclaw.tools.register(tool);
+    }
+  }
+  
+  async registerWorkflows() {
+    const workflows = [
+      require('./workflows/daily-report.json'),
+      require('./workflows/weekly-summary.json')
+    ];
+    
+    for (const workflow of workflows) {
+      await this.openclaw.workflows.register(workflow);
+    }
+  }
+  
+  async startCollector() {
+    this.collectorInterval = setInterval(
+      () => this.collectMetrics(),
+      this.config.collectInterval
+    );
+  }
+  
+  async stopCollector() {
+    if (this.collectorInterval) {
+      clearInterval(this.collectorInterval);
+    }
+  }
+  
+  async collectMetrics() {
+    const metrics = {
+      timestamp: Date.now(),
+      messages: await this.openclaw.db.count('messages'),
+      users: await this.openclaw.db.count('users'),
+      errors: await this.openclaw.db.count('errors')
+    };
+    
+    await this.openclaw.db.insert('analytics', metrics);
+  }
+}
+
+module.exports = AnalyticsPlugin;
+```
+
+---
+
+## Step 3: Create Plugin Tools
+
+### Get Stats Tool
+
+```javascript
+// src/tools/get-stats.js
+module.exports = {
+  name: 'get_analytics_stats',
+  description: 'Get analytics statistics',
+  
+  parameters: {
+    period: {
+      type: 'string',
+      enum: ['hour', 'day', 'week', 'month'],
+      default: 'day'
+    },
+    metrics: {
+      type: 'array',
+      items: { type: 'string' }
+    }
+  },
+  
+  async execute({ period, metrics }, { openclaw }) {
+    const startTime = this.calculateStartTime(period);
+    
+    const data = await openclaw.db.query(`
+      SELECT * FROM analytics
+      WHERE timestamp >= $1
+      ORDER BY timestamp ASC
+    `, [startTime]);
+    
+    return {
+      success: true,
+      period,
+      data: this.aggregateData(data, metrics)
+    };
+  },
+  
+  calculateStartTime(period) {
+    const now = Date.now();
+    const periods = {
+      hour: 3600000,
+      day: 86400000,
+      week: 604800000,
+      month: 2592000000
+    };
+    return now - periods[period];
+  },
+  
+  aggregateData(data, metrics) {
+    // Aggregate and format data
+    return data.map(row => ({
+      timestamp: row.timestamp,
+      ...metrics.reduce((acc, metric) => ({
+        ...acc,
+        [metric]: row[metric]
+      }), {})
+    }));
+  }
+};
+```
+
+### Generate Report Tool
+
+```javascript
+// src/tools/generate-report.js
+const { format } = require('date-fns');
+
+module.exports = {
+  name: 'generate_analytics_report',
+  description: 'Generate analytics report',
+  
+  parameters: {
+    period: {
+      type: 'string',
+      enum: ['daily', 'weekly', 'monthly'],
+      required: true
+    },
+    format: {
+      type: 'string',
+      enum: ['text', 'html', 'pdf'],
+      default: 'text'
+    }
+  },
+  
+  async execute({ period, format: outputFormat }, { openclaw }) {
+    // Get data
+    const stats = await openclaw.tools.execute('get_analytics_stats', {
+      period: period.replace('ly', '')
+    });
+    
+    // Generate report
+    const report = this.formatReport(stats.data, outputFormat);
+    
+    return {
+      success: true,
+      report,
+      format: outputFormat
+    };
+  },
+  
+  formatReport(data, format) {
+    if (format === 'text') {
+      return this.generateTextReport(data);
+    } else if (format === 'html') {
+      return this.generateHtmlReport(data);
+    } else if (format === 'pdf') {
+      return this.generatePdfReport(data);
+    }
+  },
+  
+  generateTextReport(data) {
+    let report = 'Analytics Report\n';
+    report += '================\n\n';
+    
+    const total = data.reduce((sum, row) => ({
+      messages: sum.messages + row.messages,
+      users: sum.users + row.users,
+      errors: sum.errors + row.errors
+    }), { messages: 0, users: 0, errors: 0 });
+    
+    report += `Total Messages: ${total.messages}\n`;
+    report += `Total Users: ${total.users}\n`;
+    report += `Total Errors: ${total.errors}\n`;
+    
+    return report;
+  }
+};
+```
+
+---
+
+## Step 4: Plugin Configuration
+
+### Configuration Schema
+
+```javascript
+// src/config/schema.js
+module.exports = {
+  type: 'object',
+  properties: {
+    collectInterval: {
+      type: 'number',
+      minimum: 10000,
+      maximum: 3600000,
+      default: 60000,
+      description: 'Metrics collection interval (ms)'
+    },
+    retentionDays: {
+      type: 'number',
+      minimum: 1,
+      maximum: 365,
+      default: 30,
+      description: 'Data retention period (days)'
+    },
+    metrics: {
+      type: 'array',
+      items: {
+        type: 'string',
+        enum: ['messages', 'users', 'errors', 'performance']
+      },
+      default: ['messages', 'users', 'errors'],
+      description: 'Metrics to collect'
+    },
+    notifications: {
+      type: 'object',
+      properties: {
+        enabled: {
+          type: 'boolean',
+          default: false
+        },
+        threshold: {
+          type: 'number',
+          default: 100
+        },
+        channels: {
+          type: 'array',
+          items: { type: 'string' }
+        }
+      }
+    }
+  }
+};
+```
+
+---
+
+## Step 5: Testing & Publishing
+
+### Unit Tests
+
+```javascript
+// tests/index.test.js
+const AnalyticsPlugin = require('../src/index');
+
+describe('Analytics Plugin', () => {
+  let plugin;
+  let mockOpenclaw;
+  
+  beforeEach(() => {
+    mockOpenclaw = {
+      tools: {
+        register: jest.fn()
+      },
+      workflows: {
+        register: jest.fn()
+      },
+      db: {
+        count: jest.fn().mockResolvedValue(100),
+        insert: jest.fn()
+      }
+    };
+    
+    plugin = new AnalyticsPlugin(mockOpenclaw);
+  });
+  
+  test('loads with default config', async () => {
+    await plugin.onLoad({});
+    expect(plugin.config.collectInterval).toBe(60000);
+  });
+  
+  test('registers tools on enable', async () => {
+    await plugin.onEnable();
+    expect(mockOpenclaw.tools.register).toHaveBeenCalledTimes(2);
+  });
+  
+  test('collects metrics', async () => {
+    await plugin.collectMetrics();
+    expect(mockOpenclaw.db.insert).toHaveBeenCalled();
+  });
+});
+```
+
+### Publish to NPM
+
+```bash
+# Login to NPM
+npm login
+
+# Publish plugin
+npm publish --access public
+
+# Install in OpenClaw
+openclaw plugin install @openclaw/analytics-plugin
+```
+
+---
+
+## Verification
+
+Test your plugin:
+
+```bash
+# Install plugin locally
+openclaw plugin install ./my-openclaw-plugin
+
+# Enable plugin
+openclaw plugin enable analytics-plugin
+
+# Test plugin tools
+openclaw tools test get_analytics_stats --period day
+
+# Check plugin status
+openclaw plugin status analytics-plugin
+
+# View plugin logs
+openclaw logs plugin analytics-plugin
+```
+
+---
+
+## Common Issues
+
+### "Plugin not loading"
+
+**Check plugin manifest:**
+
+```bash
+openclaw plugin validate ./my-openclaw-plugin
+```
+
+### "Dependency conflicts"
+
+**Check peer dependencies:**
+
+```json
+{
+  "peerDependencies": {
+    "openclaw": "^2.0.0"
+  }
+}
+```
+
+### "Tools not registering"
+
+**Enable debug mode:**
+
+```bash
+openclaw plugin enable analytics-plugin --debug
+```
+
+---
+
+## Best Practices
+
+1. **Version properly** - Use semantic versioning
+2. **Document thoroughly** - Clear README and usage docs
+3. **Test extensively** - Unit and integration tests
+4. **Handle errors** - Graceful degradation
+5. **Minimize dependencies** - Keep bundle size small
+6. **Follow conventions** - Use OpenClaw patterns
+7. **Provide examples** - Show real usage
+8. **Support configuration** - Make it customizable
+
+---
+
+## Next Steps
+
+You can now create and distribute plugins! 
+
+**Continue to Module 20:** [Production Deployment](/learn/production-deployment) to deploy at scale with monitoring and failover.
+
+**Need help?** Contact support or join the [Discord community](https://discord.com).

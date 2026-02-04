@@ -1,0 +1,610 @@
+---
+id: "17"
+slug: "complex-workflows"
+title: "Complex Workflows"
+description: "Multi-step automation and cron job scheduling"
+tier: "builder"
+level: 3
+estimatedTime: "55 min"
+---
+
+# Complex Workflows
+
+🔒 **Builder Tier Module** - [Upgrade to access](/support)
+
+Orchestrate multi-step automation, schedule recurring tasks, and build sophisticated workflows that combine multiple tools and actions.
+
+## What You'll Learn
+
+- ✅ Create multi-step workflow definitions
+- ✅ Schedule cron jobs and recurring tasks
+- ✅ Implement state management across steps
+- ✅ Handle errors and retries in workflows
+- ✅ Real examples: Daily reports, Scheduled backups
+
+## Prerequisites
+
+Complete Module 15 (Custom Tools) before starting this module.
+
+---
+
+## Step 1: Workflow Definition
+
+### Create Your First Workflow
+
+```bash
+mkdir -p ~/.openclaw/workflows
+nano ~/.openclaw/workflows/daily-report.json
+```
+
+```json
+{
+  "name": "daily_report",
+  "description": "Generate and send daily summary report",
+  "version": "1.0.0",
+  "schedule": "0 9 * * *",  // 9 AM daily
+  "steps": [
+    {
+      "id": "fetch_data",
+      "tool": "db_query",
+      "params": {
+        "table": "messages",
+        "filters": {
+          "created_after": "{{yesterday}}",
+          "limit": 100
+        }
+      },
+      "output": "messages"
+    },
+    {
+      "id": "analyze_data",
+      "tool": "ai_analyze",
+      "params": {
+        "data": "{{steps.fetch_data.output}}",
+        "prompt": "Summarize these messages into a daily report"
+      },
+      "output": "report"
+    },
+    {
+      "id": "send_report",
+      "tool": "send_email",
+      "params": {
+        "to": "admin@example.com",
+        "subject": "Daily Report - {{date}}",
+        "body": "{{steps.analyze_data.output}}"
+      }
+    }
+  ],
+  "onError": {
+    "retry": 3,
+    "backoff": "exponential",
+    "notify": ["admin@example.com"]
+  }
+}
+```
+
+---
+
+## Step 2: Cron Job Scheduling
+
+### Enable Cron Scheduler
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+```json
+{
+  "scheduler": {
+    "enabled": true,
+    "timezone": "America/New_York",
+    "maxConcurrent": 5,
+    "logging": {
+      "enabled": true,
+      "path": "/var/log/openclaw/cron.log"
+    }
+  }
+}
+```
+
+### Schedule Workflows
+
+```json
+{
+  "cron": {
+    "jobs": [
+      {
+        "name": "daily_backup",
+        "schedule": "0 2 * * *",  // 2 AM daily
+        "workflow": "backup_database",
+        "enabled": true
+      },
+      {
+        "name": "hourly_health_check",
+        "schedule": "0 * * * *",  // Every hour
+        "workflow": "health_check",
+        "enabled": true
+      },
+      {
+        "name": "weekly_report",
+        "schedule": "0 9 * * 1",  // Monday 9 AM
+        "workflow": "weekly_summary",
+        "enabled": true
+      }
+    ]
+  }
+}
+```
+
+### Cron Schedule Syntax
+
+```
+┌───────────── minute (0 - 59)
+│ ┌───────────── hour (0 - 23)
+│ │ ┌───────────── day of month (1 - 31)
+│ │ │ ┌───────────── month (1 - 12)
+│ │ │ │ ┌───────────── day of week (0 - 6) (Sunday=0)
+│ │ │ │ │
+* * * * *
+```
+
+**Examples:**
+- `0 9 * * *` - Every day at 9 AM
+- `*/15 * * * *` - Every 15 minutes
+- `0 0 * * 0` - Every Sunday at midnight
+- `0 */6 * * *` - Every 6 hours
+
+---
+
+## Step 3: State Management
+
+### Workflow with State
+
+```json
+{
+  "name": "multi_step_task",
+  "state": {
+    "storage": "redis",  // or "memory", "file"
+    "ttl": 3600  // 1 hour
+  },
+  "steps": [
+    {
+      "id": "step1",
+      "tool": "fetch_data",
+      "saveState": {
+        "key": "fetched_data",
+        "value": "{{output}}"
+      }
+    },
+    {
+      "id": "step2",
+      "tool": "process_data",
+      "params": {
+        "data": "{{state.fetched_data}}"
+      },
+      "condition": "{{state.fetched_data.length > 0}}"
+    }
+  ]
+}
+```
+
+### Persistent State Example
+
+```bash
+nano ~/.openclaw/workflows/price-tracker.json
+```
+
+```json
+{
+  "name": "price_tracker",
+  "schedule": "0 */6 * * *",
+  "state": {
+    "storage": "redis",
+    "persist": true
+  },
+  "steps": [
+    {
+      "id": "get_current_price",
+      "tool": "price_monitor",
+      "params": {
+        "url": "https://example.com/product",
+        "priceSelector": ".price"
+      },
+      "output": "currentPrice"
+    },
+    {
+      "id": "compare_price",
+      "condition": "{{state.lastPrice !== null}}",
+      "script": `
+        const change = currentPrice - state.lastPrice;
+        const percentChange = (change / state.lastPrice) * 100;
+        return { change, percentChange };
+      `,
+      "output": "priceChange"
+    },
+    {
+      "id": "notify_if_drop",
+      "condition": "{{priceChange.percentChange < -10}}",
+      "tool": "send_notification",
+      "params": {
+        "message": "Price dropped by {{priceChange.percentChange}}%!"
+      }
+    },
+    {
+      "id": "save_price",
+      "saveState": {
+        "key": "lastPrice",
+        "value": "{{currentPrice}}"
+      }
+    }
+  ]
+}
+```
+
+---
+
+## Step 4: Error Handling & Retries
+
+### Retry Configuration
+
+```json
+{
+  "name": "resilient_workflow",
+  "steps": [
+    {
+      "id": "api_call",
+      "tool": "external_api",
+      "retry": {
+        "maxAttempts": 3,
+        "backoff": "exponential",
+        "initialDelay": 1000,
+        "maxDelay": 10000,
+        "retryOn": ["timeout", "network_error"]
+      },
+      "timeout": 30000
+    }
+  ],
+  "onError": {
+    "notify": ["admin@example.com"],
+    "fallback": "use_cached_data"
+  }
+}
+```
+
+### Error Handling Strategies
+
+```json
+{
+  "steps": [
+    {
+      "id": "risky_operation",
+      "tool": "external_service",
+      "onError": {
+        "action": "continue",  // or "stop", "retry"
+        "log": true,
+        "notify": true
+      }
+    },
+    {
+      "id": "fallback_operation",
+      "condition": "{{steps.risky_operation.error !== null}}",
+      "tool": "backup_service"
+    }
+  ]
+}
+```
+
+---
+
+## Step 5: Advanced Workflow Patterns
+
+### Parallel Execution
+
+```json
+{
+  "name": "parallel_tasks",
+  "steps": [
+    {
+      "id": "parallel_group",
+      "type": "parallel",
+      "tasks": [
+        {
+          "id": "task1",
+          "tool": "fetch_weather"
+        },
+        {
+          "id": "task2",
+          "tool": "fetch_news"
+        },
+        {
+          "id": "task3",
+          "tool": "fetch_stocks"
+        }
+      ],
+      "waitForAll": true
+    },
+    {
+      "id": "combine_results",
+      "tool": "ai_summarize",
+      "params": {
+        "data": [
+          "{{steps.parallel_group.task1.output}}",
+          "{{steps.parallel_group.task2.output}}",
+          "{{steps.parallel_group.task3.output}}"
+        ]
+      }
+    }
+  ]
+}
+```
+
+### Conditional Branching
+
+```json
+{
+  "steps": [
+    {
+      "id": "check_condition",
+      "tool": "evaluate",
+      "output": "shouldProceed"
+    },
+    {
+      "id": "branch",
+      "type": "conditional",
+      "condition": "{{shouldProceed}}",
+      "then": [
+        {
+          "id": "action_a",
+          "tool": "do_something"
+        }
+      ],
+      "else": [
+        {
+          "id": "action_b",
+          "tool": "do_something_else"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Loop Iteration
+
+```json
+{
+  "steps": [
+    {
+      "id": "get_items",
+      "tool": "fetch_list",
+      "output": "items"
+    },
+    {
+      "id": "process_each",
+      "type": "foreach",
+      "items": "{{items}}",
+      "do": [
+        {
+          "id": "process_item",
+          "tool": "process",
+          "params": {
+            "item": "{{current}}"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## Verification
+
+Test workflows:
+
+```bash
+# List all workflows
+openclaw workflows list
+
+# Test workflow manually
+openclaw workflows run daily_report --dry-run
+
+# Check cron jobs
+openclaw cron list
+
+# View cron logs
+openclaw logs cron
+
+# Test specific cron job
+openclaw cron run daily_backup --now
+```
+
+---
+
+## Common Issues
+
+### "Workflow not executing on schedule"
+
+**Check cron status:**
+
+```bash
+openclaw cron status
+
+# Enable if disabled
+openclaw cron enable daily_backup
+```
+
+### "Step failing silently"
+
+**Enable verbose logging:**
+
+```json
+{
+  "logging": {
+    "level": "debug",
+    "steps": true
+  }
+}
+```
+
+### "State not persisting"
+
+**Verify Redis connection:**
+
+```bash
+redis-cli ping
+
+# Check OpenClaw Redis config
+openclaw config get state.storage
+```
+
+---
+
+## Real-World Workflow Examples
+
+### 1. **Daily Backup Workflow**
+
+```json
+{
+  "name": "daily_backup",
+  "schedule": "0 2 * * *",
+  "steps": [
+    {
+      "id": "backup_database",
+      "tool": "pg_dump",
+      "params": {
+        "database": "openclaw",
+        "output": "/backups/db-{{date}}.sql"
+      }
+    },
+    {
+      "id": "compress_backup",
+      "tool": "gzip",
+      "params": {
+        "file": "{{steps.backup_database.output}}"
+      }
+    },
+    {
+      "id": "upload_to_s3",
+      "tool": "s3_upload",
+      "params": {
+        "file": "{{steps.compress_backup.output}}",
+        "bucket": "backups"
+      }
+    },
+    {
+      "id": "cleanup_old",
+      "tool": "delete_old_backups",
+      "params": {
+        "olderThan": 30  // days
+      }
+    },
+    {
+      "id": "notify_success",
+      "tool": "send_email",
+      "params": {
+        "to": "admin@example.com",
+        "subject": "Backup completed",
+        "body": "Database backup successful"
+      }
+    }
+  ]
+}
+```
+
+### 2. **Social Media Scheduler**
+
+```json
+{
+  "name": "social_media_post",
+  "schedule": "0 10,14,18 * * *",  // 10 AM, 2 PM, 6 PM
+  "steps": [
+    {
+      "id": "get_content",
+      "tool": "ai_generate",
+      "params": {
+        "prompt": "Generate an engaging social media post about AI"
+      }
+    },
+    {
+      "id": "post_to_twitter",
+      "tool": "twitter_post",
+      "params": {
+        "text": "{{steps.get_content.output}}"
+      }
+    },
+    {
+      "id": "post_to_linkedin",
+      "tool": "linkedin_post",
+      "params": {
+        "text": "{{steps.get_content.output}}"
+      }
+    }
+  ]
+}
+```
+
+### 3. **Health Monitoring Workflow**
+
+```json
+{
+  "name": "health_check",
+  "schedule": "*/5 * * * *",  // Every 5 minutes
+  "steps": [
+    {
+      "id": "check_api",
+      "tool": "http_get",
+      "params": {
+        "url": "https://api.example.com/health"
+      },
+      "timeout": 5000
+    },
+    {
+      "id": "check_database",
+      "tool": "db_ping"
+    },
+    {
+      "id": "check_redis",
+      "tool": "redis_ping"
+    },
+    {
+      "id": "alert_if_down",
+      "condition": "{{steps.check_api.error || steps.check_database.error}}",
+      "tool": "send_alert",
+      "params": {
+        "severity": "critical",
+        "message": "Service health check failed"
+      }
+    }
+  ]
+}
+```
+
+---
+
+## Best Practices
+
+1. **Keep workflows focused** - One workflow = one purpose
+2. **Use descriptive IDs** - Make debugging easier
+3. **Implement error handling** - Always have a fallback
+4. **Log everything** - Track workflow execution
+5. **Test before scheduling** - Use `--dry-run`
+6. **Monitor execution** - Set up alerts
+7. **Version workflows** - Track changes
+8. **Document dependencies** - Clear prerequisites
+
+---
+
+## Next Steps
+
+🎉 **Builder Tier Complete!** You've mastered advanced OpenClaw features.
+
+**Ready for enterprise?** Upgrade to **Architect Tier** ($199) to unlock:
+- Module 18: Multi-Agent Systems
+- Module 19: Plugin Development
+- Module 20: Production Deployment
+
+[Upgrade to Architect Tier](/support) →
+
+**Need help?** Contact support or join the [Discord community](https://discord.com).

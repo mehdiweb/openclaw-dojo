@@ -1,0 +1,542 @@
+---
+id: "12"
+slug: "security-basics"
+title: "Security Basics"
+description: "Access control, rate limiting, and basic hardening"
+tier: "free"
+level: 2
+estimatedTime: "30 min"
+---
+
+# Security Basics
+
+Protect your AI agent from abuse, unauthorized access, and security threats. Implement essential security practices before going to production.
+
+## What You'll Learn
+
+- ✅ Configure access control lists (ACLs)
+- ✅ Implement rate limiting
+- ✅ Sanitize user inputs
+- ✅ Manage API keys securely
+- ✅ Set up basic firewall rules
+
+## Prerequisites
+
+Complete Module 6 (Testing Your Setup) before starting this module.
+
+---
+
+## Step 1: Access Control Lists (ACLs)
+
+Control who can use your agent.
+
+### Configure User Whitelist
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+Add ACL configuration:
+
+```json
+{
+  "security": {
+    "acl": {
+      "enabled": true,
+      "mode": "whitelist",  // or "blacklist"
+      "users": [
+        "+1234567890",  // WhatsApp number
+        "@username",  // Telegram username
+        "user@email.com"  // Email
+      ],
+      "admins": [
+        "+1234567890"  // Admin users
+      ]
+    }
+  }
+}
+```
+
+### Role-Based Access
+
+```json
+{
+  "security": {
+    "roles": {
+      "admin": {
+        "users": ["+1234567890"],
+        "permissions": ["*"]  // All permissions
+      },
+      "user": {
+        "users": ["+0987654321"],
+        "permissions": ["chat", "weather", "news"]
+      },
+      "guest": {
+        "users": ["*"],  // Everyone else
+        "permissions": ["chat"]
+      }
+    }
+  }
+}
+```
+
+### Test ACL
+
+```bash
+# Add user to whitelist
+openclaw acl add-user "+1234567890"
+
+# Remove user
+openclaw acl remove-user "+1234567890"
+
+# List all users
+openclaw acl list
+
+# Check if user has access
+openclaw acl check "+1234567890"
+```
+
+---
+
+## Step 2: Rate Limiting
+
+Prevent abuse and control costs.
+
+### Configure Rate Limits
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+```json
+{
+  "security": {
+    "rateLimit": {
+      "enabled": true,
+      "global": {
+        "maxRequests": 100,
+        "windowMs": 60000  // 1 minute
+      },
+      "perUser": {
+        "maxRequests": 10,
+        "windowMs": 60000
+      },
+      "perCommand": {
+        "weather": {
+          "maxRequests": 5,
+          "windowMs": 60000
+        },
+        "image_generation": {
+          "maxRequests": 2,
+          "windowMs": 300000  // 5 minutes
+        }
+      }
+    }
+  }
+}
+```
+
+### Advanced Rate Limiting
+
+```json
+{
+  "security": {
+    "rateLimit": {
+      "tiers": {
+        "free": {
+          "maxRequests": 10,
+          "windowMs": 60000
+        },
+        "premium": {
+          "maxRequests": 100,
+          "windowMs": 60000
+        },
+        "admin": {
+          "maxRequests": -1  // Unlimited
+        }
+      },
+      "userTiers": {
+        "+1234567890": "premium",
+        "+0987654321": "free"
+      }
+    }
+  }
+}
+```
+
+### Test Rate Limiting
+
+```bash
+# Check rate limit status for user
+openclaw rate-limit status "+1234567890"
+
+# Reset rate limit for user
+openclaw rate-limit reset "+1234567890"
+
+# View rate limit logs
+openclaw logs rate-limit
+```
+
+---
+
+## Step 3: Input Sanitization
+
+Protect against injection attacks and malicious inputs.
+
+### Enable Input Validation
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+```json
+{
+  "security": {
+    "input": {
+      "sanitize": true,
+      "maxLength": 4000,  // Max message length
+      "stripHtml": true,
+      "blockPatterns": [
+        "eval\\(",
+        "exec\\(",
+        "<script",
+        "javascript:",
+        "data:text/html"
+      ],
+      "allowedFileTypes": [
+        "image/jpeg",
+        "image/png",
+        "application/pdf"
+      ]
+    }
+  }
+}
+```
+
+### Custom Sanitization Rules
+
+```javascript
+// ~/.openclaw/security/sanitizer.js
+module.exports = {
+  sanitizeMessage: (message) => {
+    // Remove SQL injection attempts
+    message = message.replace(/(\bDROP\b|\bDELETE\b|\bINSERT\b)/gi, '');
+    
+    // Remove command injection
+    message = message.replace(/[;&|`$()]/g, '');
+    
+    // Limit length
+    if (message.length > 4000) {
+      message = message.substring(0, 4000);
+    }
+    
+    return message;
+  }
+};
+```
+
+---
+
+## Step 4: API Key Management
+
+Secure your API keys and credentials.
+
+### Use Environment Variables
+
+```bash
+nano .env
+```
+
+**Good:**
+```bash
+ANTHROPIC_API_KEY=sk-ant-xxxxx
+OPENAI_API_KEY=sk-xxxxx
+DATABASE_PASSWORD=secure_password
+```
+
+**Bad (Never do this):**
+```json
+{
+  "apiKey": "sk-ant-xxxxx"  // Don't hardcode!
+}
+```
+
+### Encrypt Sensitive Data
+
+```bash
+# Install encryption tool
+npm install -g openclaw-secrets
+
+# Encrypt .env file
+openclaw-secrets encrypt .env
+
+# Decrypt (automatic on startup)
+openclaw-secrets decrypt .env.encrypted
+```
+
+### Rotate API Keys
+
+```bash
+# Set up key rotation
+nano ~/.openclaw/config.json
+```
+
+```json
+{
+  "security": {
+    "keyRotation": {
+      "enabled": true,
+      "interval": 2592000000,  // 30 days in ms
+      "notify": ["admin@yourdomain.com"]
+    }
+  }
+}
+```
+
+### API Key Permissions
+
+Limit what each key can do:
+
+```json
+{
+  "security": {
+    "apiKeys": {
+      "anthropic": {
+        "key": "${ANTHROPIC_API_KEY}",
+        "permissions": ["chat", "vision"],
+        "rateLimit": {
+          "maxRequests": 1000,
+          "windowMs": 86400000  // per day
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+## Step 5: Basic Firewall Rules
+
+Protect your server from network attacks.
+
+### Configure UFW (Ubuntu)
+
+```bash
+# Install UFW
+sudo apt install ufw
+
+# Default policies
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# Allow SSH
+sudo ufw allow 22/tcp
+
+# Allow OpenClaw ports
+sudo ufw allow 3000/tcp  # Dashboard
+sudo ufw allow 3001/tcp  # Webhooks
+
+# Enable firewall
+sudo ufw enable
+
+# Check status
+sudo ufw status
+```
+
+### IP Whitelisting
+
+```bash
+# Allow specific IP
+sudo ufw allow from 203.0.113.0/24 to any port 3000
+
+# Block specific IP
+sudo ufw deny from 198.51.100.0
+```
+
+### Fail2Ban (Brute Force Protection)
+
+```bash
+# Install Fail2Ban
+sudo apt install fail2ban
+
+# Configure for OpenClaw
+sudo nano /etc/fail2ban/jail.local
+```
+
+```ini
+[openclaw]
+enabled = true
+port = 3000,3001
+filter = openclaw
+logpath = /var/log/openclaw/access.log
+maxretry = 5
+bantime = 3600
+```
+
+---
+
+## Verification
+
+Check security status:
+
+```bash
+# Security audit
+openclaw security audit
+
+# Should show:
+# ✓ ACL enabled
+# ✓ Rate limiting active
+# ✓ Input sanitization on
+# ✓ API keys encrypted
+# ✓ Firewall configured
+
+# Test security
+openclaw security test
+```
+
+---
+
+## Common Issues
+
+### "User blocked by ACL"
+
+**Check whitelist:**
+
+```bash
+openclaw acl list
+
+# Add user if needed
+openclaw acl add-user "+1234567890"
+```
+
+### "Rate limit exceeded"
+
+**Check user's limit:**
+
+```bash
+openclaw rate-limit status "+1234567890"
+
+# Increase limit or reset
+openclaw rate-limit reset "+1234567890"
+```
+
+### "Input sanitization too strict"
+
+**Adjust rules:**
+
+```json
+{
+  "security": {
+    "input": {
+      "sanitize": true,
+      "strictMode": false,  // Less strict
+      "maxLength": 8000  // Increase limit
+    }
+  }
+}
+```
+
+### "Firewall blocking legitimate traffic"
+
+**Check UFW logs:**
+
+```bash
+sudo tail -f /var/log/ufw.log
+
+# Allow specific IP
+sudo ufw allow from 203.0.113.100
+```
+
+---
+
+## Security Best Practices
+
+### 1. **Principle of Least Privilege**
+
+Give users only the permissions they need:
+
+```json
+{
+  "roles": {
+    "user": {
+      "permissions": ["chat", "weather"]  // Not "admin" or "*"
+    }
+  }
+}
+```
+
+### 2. **Defense in Depth**
+
+Layer multiple security measures:
+- ACL (who can access)
+- Rate limiting (how much)
+- Input sanitization (what they can send)
+- Firewall (network level)
+
+### 3. **Regular Audits**
+
+```bash
+# Weekly security check
+openclaw security audit --verbose
+
+# Check for suspicious activity
+openclaw logs security --since "7 days ago"
+```
+
+### 4. **Monitor Everything**
+
+```json
+{
+  "security": {
+    "monitoring": {
+      "enabled": true,
+      "alerts": {
+        "failedLogins": 5,
+        "rateLimitHits": 10,
+        "suspiciousPatterns": true
+      },
+      "notify": ["admin@yourdomain.com"]
+    }
+  }
+}
+```
+
+### 5. **Keep Software Updated**
+
+```bash
+# Update OpenClaw
+npm update -g openclaw
+
+# Update system packages
+sudo apt update && sudo apt upgrade
+```
+
+---
+
+## Security Checklist
+
+Before going to production:
+
+- [ ] ACL configured with whitelist
+- [ ] Rate limiting enabled
+- [ ] Input sanitization active
+- [ ] API keys in environment variables
+- [ ] Firewall rules configured
+- [ ] Fail2Ban installed
+- [ ] HTTPS enabled (Module 14)
+- [ ] Regular backups configured
+- [ ] Monitoring and alerts set up
+- [ ] Security audit passed
+
+---
+
+## Next Steps
+
+Your agent is now protected with basic security! 
+
+**Continue to Module 13:** [Performance Tuning](/learn/performance-tuning) to optimize speed and resource usage.
+
+**For advanced security:** Upgrade to Builder tier for Module 14 (Advanced Defense) covering DDoS protection, intrusion detection, and encryption.
+
+**Need help?** Join the [Discord community](https://discord.com) for security advice.

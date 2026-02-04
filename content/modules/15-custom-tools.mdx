@@ -1,0 +1,616 @@
+---
+id: "15"
+slug: "custom-tools"
+title: "Custom Tools"
+description: "Build and integrate custom AI tools and functions"
+tier: "builder"
+level: 3
+estimatedTime: "60 min"
+---
+
+# Custom Tools
+
+🔒 **Builder Tier Module** - [Upgrade to access](/support)
+
+Extend your AI agent's capabilities by building custom tools and functions. Create anything from simple calculators to complex database queries.
+
+## What You'll Learn
+
+- ✅ Understand the tool development framework
+- ✅ Create custom functions with parameters
+- ✅ Implement tool validation and error handling
+- ✅ Test and debug custom tools
+- ✅ Real examples: Calculator, Database query, File manager
+
+## Prerequisites
+
+Complete Module 9 (Network Integration) before starting this module.
+
+---
+
+## Step 1: Tool Development Framework
+
+### Tool Structure
+
+Every tool has three parts:
+1. **Definition** - What the tool does
+2. **Parameters** - What inputs it needs
+3. **Handler** - The actual code
+
+### Create Your First Tool
+
+```bash
+mkdir -p ~/.openclaw/tools
+nano ~/.openclaw/tools/calculator.json
+```
+
+```json
+{
+  "name": "calculator",
+  "description": "Perform mathematical calculations",
+  "version": "1.0.0",
+  "parameters": {
+    "expression": {
+      "type": "string",
+      "description": "Mathematical expression (e.g., '2 + 2', '10 * 5')",
+      "required": true,
+      "validation": {
+        "pattern": "^[0-9+\\-*/().\\s]+$",
+        "maxLength": 100
+      }
+    }
+  },
+  "handler": "calculator.js",
+  "examples": [
+    {
+      "input": {"expression": "2 + 2"},
+      "output": "4"
+    },
+    {
+      "input": {"expression": "(10 + 5) * 2"},
+      "output": "30"
+    }
+  ]
+}
+```
+
+### Implement the Handler
+
+```bash
+nano ~/.openclaw/tools/calculator.js
+```
+
+```javascript
+module.exports = {
+  name: 'calculator',
+  
+  execute: async (params) => {
+    const { expression } = params;
+    
+    try {
+      // Validate expression (security!)
+      if (!/^[0-9+\-*/().\s]+$/.test(expression)) {
+        throw new Error('Invalid expression');
+      }
+      
+      // Evaluate safely
+      const result = Function(`'use strict'; return (${expression})`)();
+      
+      return {
+        success: true,
+        result: result,
+        expression: expression
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+};
+```
+
+### Test the Tool
+
+```bash
+# Reload tools
+openclaw tools reload
+
+# Test calculator
+openclaw tools test calculator --expression "2 + 2"
+
+# Should return: 4
+```
+
+---
+
+## Step 2: Advanced Tool with Database
+
+### Create Database Query Tool
+
+```bash
+nano ~/.openclaw/tools/db-query.json
+```
+
+```json
+{
+  "name": "db_query",
+  "description": "Query the database",
+  "parameters": {
+    "table": {
+      "type": "string",
+      "description": "Table name",
+      "required": true,
+      "enum": ["users", "messages", "logs"]
+    },
+    "filters": {
+      "type": "object",
+      "description": "Query filters",
+      "properties": {
+        "user_id": {"type": "string"},
+        "created_after": {"type": "string"},
+        "limit": {"type": "number", "default": 10}
+      }
+    }
+  },
+  "handler": "db-query.js",
+  "permissions": ["database.read"]
+}
+```
+
+### Implement Database Handler
+
+```bash
+nano ~/.openclaw/tools/db-query.js
+```
+
+```javascript
+const { Pool } = require('pg');
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
+
+module.exports = {
+  name: 'db_query',
+  
+  execute: async (params) => {
+    const { table, filters = {} } = params;
+    
+    try {
+      // Build safe query
+      let query = `SELECT * FROM ${table}`;
+      const values = [];
+      const conditions = [];
+      
+      if (filters.user_id) {
+        conditions.push(`user_id = $${values.length + 1}`);
+        values.push(filters.user_id);
+      }
+      
+      if (filters.created_after) {
+        conditions.push(`created_at > $${values.length + 1}`);
+        values.push(filters.created_after);
+      }
+      
+      if (conditions.length > 0) {
+        query += ` WHERE ${conditions.join(' AND ')}`;
+      }
+      
+      query += ` LIMIT $${values.length + 1}`;
+      values.push(filters.limit || 10);
+      
+      // Execute query
+      const result = await pool.query(query, values);
+      
+      return {
+        success: true,
+        rows: result.rows,
+        count: result.rowCount
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+};
+```
+
+---
+
+## Step 3: File Manager Tool
+
+### Create File Operations Tool
+
+```bash
+nano ~/.openclaw/tools/file-manager.json
+```
+
+```json
+{
+  "name": "file_manager",
+  "description": "Manage files and directories",
+  "parameters": {
+    "action": {
+      "type": "string",
+      "enum": ["list", "read", "write", "delete"],
+      "required": true
+    },
+    "path": {
+      "type": "string",
+      "description": "File or directory path",
+      "required": true
+    },
+    "content": {
+      "type": "string",
+      "description": "Content to write (for write action)"
+    }
+  },
+  "handler": "file-manager.js",
+  "permissions": ["filesystem.read", "filesystem.write"]
+}
+```
+
+### Implement File Handler
+
+```bash
+nano ~/.openclaw/tools/file-manager.js
+```
+
+```javascript
+const fs = require('fs').promises;
+const path = require('path');
+
+// Allowed base directory
+const BASE_DIR = process.env.OPENCLAW_FILES_DIR || '/tmp/openclaw';
+
+module.exports = {
+  name: 'file_manager',
+  
+  execute: async (params) => {
+    const { action, path: filePath, content } = params;
+    
+    // Security: Ensure path is within BASE_DIR
+    const fullPath = path.resolve(BASE_DIR, filePath);
+    if (!fullPath.startsWith(BASE_DIR)) {
+      return {
+        success: false,
+        error: 'Access denied: Path outside allowed directory'
+      };
+    }
+    
+    try {
+      switch (action) {
+        case 'list':
+          const files = await fs.readdir(fullPath);
+          return {
+            success: true,
+            files: files
+          };
+          
+        case 'read':
+          const fileContent = await fs.readFile(fullPath, 'utf8');
+          return {
+            success: true,
+            content: fileContent
+          };
+          
+        case 'write':
+          await fs.writeFile(fullPath, content, 'utf8');
+          return {
+            success: true,
+            message: 'File written successfully'
+          };
+          
+        case 'delete':
+          await fs.unlink(fullPath);
+          return {
+            success: true,
+            message: 'File deleted successfully'
+          };
+          
+        default:
+          return {
+            success: false,
+            error: 'Invalid action'
+          };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+};
+```
+
+---
+
+## Step 4: Tool Validation & Error Handling
+
+### Input Validation
+
+```javascript
+// ~/.openclaw/tools/validators.js
+module.exports = {
+  validateEmail: (email) => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+  },
+  
+  validatePhone: (phone) => {
+    const regex = /^\+?[1-9]\d{1,14}$/;
+    return regex.test(phone);
+  },
+  
+  validateUrl: (url) => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  
+  sanitizeInput: (input) => {
+    // Remove dangerous characters
+    return input.replace(/[<>\"'&]/g, '');
+  }
+};
+```
+
+### Error Handling Pattern
+
+```javascript
+module.exports = {
+  execute: async (params) => {
+    try {
+      // Validate inputs
+      if (!params.required_field) {
+        throw new Error('Missing required field');
+      }
+      
+      // Execute logic
+      const result = await someAsyncOperation(params);
+      
+      // Return success
+      return {
+        success: true,
+        data: result
+      };
+      
+    } catch (error) {
+      // Log error
+      console.error(`Tool error: ${error.message}`);
+      
+      // Return user-friendly error
+      return {
+        success: false,
+        error: error.message,
+        code: error.code || 'UNKNOWN_ERROR'
+      };
+    }
+  }
+};
+```
+
+---
+
+## Step 5: Testing & Debugging
+
+### Unit Tests
+
+```bash
+nano ~/.openclaw/tools/__tests__/calculator.test.js
+```
+
+```javascript
+const calculator = require('../calculator');
+
+describe('Calculator Tool', () => {
+  test('adds two numbers', async () => {
+    const result = await calculator.execute({
+      expression: '2 + 2'
+    });
+    
+    expect(result.success).toBe(true);
+    expect(result.result).toBe(4);
+  });
+  
+  test('handles invalid expression', async () => {
+    const result = await calculator.execute({
+      expression: 'alert("xss")'
+    });
+    
+    expect(result.success).toBe(false);
+  });
+});
+```
+
+### Run Tests
+
+```bash
+# Install test framework
+npm install -g jest
+
+# Run tests
+cd ~/.openclaw/tools
+jest
+```
+
+### Debug Mode
+
+```bash
+# Enable debug logging
+openclaw config set tools.debug true
+
+# Test tool with verbose output
+openclaw tools test calculator --expression "2+2" --debug
+
+# View tool logs
+openclaw logs tools
+```
+
+---
+
+## Verification
+
+Test all custom tools:
+
+```bash
+# List all tools
+openclaw tools list
+
+# Should show:
+# - calculator (custom)
+# - db_query (custom)
+# - file_manager (custom)
+# - get_weather (built-in)
+# - get_news (built-in)
+
+# Test each tool
+openclaw tools test calculator --expression "10 * 5"
+openclaw tools test db_query --table users --filters '{"limit": 5}'
+openclaw tools test file_manager --action list --path "/"
+```
+
+---
+
+## Common Issues
+
+### "Tool not found"
+
+**Reload tools:**
+
+```bash
+openclaw tools reload
+
+# Or restart OpenClaw
+openclaw restart
+```
+
+### "Permission denied"
+
+**Check tool permissions:**
+
+```json
+{
+  "permissions": ["database.read", "filesystem.write"]
+}
+```
+
+**Grant permissions to user:**
+
+```bash
+openclaw permissions grant user_id database.read
+```
+
+### "Tool execution timeout"
+
+**Increase timeout:**
+
+```json
+{
+  "tools": {
+    "timeout": 30000,  // 30 seconds
+    "maxConcurrent": 5
+  }
+}
+```
+
+---
+
+## Real-World Tool Examples
+
+### 1. **Weather Forecast (7 days)**
+
+```javascript
+module.exports = {
+  execute: async ({ city }) => {
+    const response = await fetch(
+      `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${process.env.OPENWEATHER_API_KEY}`
+    );
+    const data = await response.json();
+    
+    return {
+      success: true,
+      forecast: data.list.slice(0, 7)
+    };
+  }
+};
+```
+
+### 2. **Send Email**
+
+```javascript
+const nodemailer = require('nodemailer');
+
+module.exports = {
+  execute: async ({ to, subject, body }) => {
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+    
+    await transporter.sendMail({
+      from: 'bot@yourdomain.com',
+      to,
+      subject,
+      text: body
+    });
+    
+    return { success: true };
+  }
+};
+```
+
+### 3. **Image Resize**
+
+```javascript
+const sharp = require('sharp');
+
+module.exports = {
+  execute: async ({ imagePath, width, height }) => {
+    const outputPath = imagePath.replace('.jpg', '_resized.jpg');
+    
+    await sharp(imagePath)
+      .resize(width, height)
+      .toFile(outputPath);
+    
+    return {
+      success: true,
+      outputPath
+    };
+  }
+};
+```
+
+---
+
+## Best Practices
+
+1. **Always validate inputs** - Never trust user input
+2. **Handle errors gracefully** - Return user-friendly messages
+3. **Use async/await** - For better error handling
+4. **Log everything** - Debug issues easily
+5. **Write tests** - Ensure tools work correctly
+6. **Document parameters** - Clear descriptions
+7. **Version your tools** - Track changes
+8. **Limit permissions** - Principle of least privilege
+
+---
+
+## Next Steps
+
+You can now build any custom functionality! 
+
+**Continue to Module 16:** [Browser Automation](/learn/browser-automation) to add web scraping and browser control.
+
+**Need help?** Contact support or join the [Discord community](https://discord.com).

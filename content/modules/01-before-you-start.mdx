@@ -1,0 +1,76 @@
+---
+id: "01"
+slug: "before-you-start"
+title: "Before You Start"
+description: "Prerequisites and what you need to deploy OpenClaw successfully"
+tier: "free"
+level: 1
+estimatedTime: "10 min"
+---
+
+# Before You Start
+
+## What Is OpenClaw Really?
+
+Let's clear up the confusion:
+
+- **OpenClaw** = The gateway software (connects chat apps to AI)
+- **Pi** = The AI agent that actually responds (you'll configure this)
+- **Clawd** = Our friendly lobster mascot 🦞
+
+OpenClaw is a bridge. It lets you talk to AI agents (like Pi) through WhatsApp, Telegram, Discord, or iMessage.
+
+## What You'll Need
+
+Before we start, make sure you have:
+
+### Required:
+1. **A VPS or always-on computer** ($6-20/month)
+   - DigitalOcean, Hetzner, AWS, or any cloud provider
+   - Your laptop won't work (needs to be always on)
+   
+2. **Node.js version 22 or higher**
+   - Check: `node --version`
+   - Install: https://nodejs.org
+   
+3. **Basic terminal comfort**
+   - Copy-pasting commands
+   - Editing text files
+   - SSH into servers
+
+4. **Time: 2-4 hours**
+   - First setup takes time
+   - Future updates are faster
+
+### For WhatsApp:
+- A **separate phone number** (recommended)
+  - Your personal number works but isn't ideal
+  - Cheap options: Hetzner eSIM, giffgaff, any prepaid SIM
+  
+### For Telegram:
+- A Telegram account
+- 5 minutes with @BotFather
+
+### API Keys (for AI):
+- Anthropic API key (Claude) - https://console.anthropic.com
+- OR OpenAI API key - https://platform.openai.com
+- Budget: $5-20/month depending on usage
+
+## ⚠️ Important Warnings
+
+**DON'T use Bun:** WhatsApp and Telegram have known issues with Bun runtime. Use Node.js.
+
+**This isn't "no-code":** You'll edit config files and run terminal commands. If that scares you, consider hiring professional installation help instead.
+
+**First-time setup is hard:** It gets easier after the first one. That's why I made this guide.
+
+## Check Your Readiness
+
+Before continuing, confirm:
+- [ ] You have a VPS or spare computer that stays on
+- [ ] Node.js ≥22 is installed (or you know how to install it)
+- [ ] You're comfortable with basic terminal commands
+- [ ] You have $10-30 for API credits this month
+
+**If you checked all boxes:** Continue to Module 2  
+**If not:** Get those ready first, or hire professional help

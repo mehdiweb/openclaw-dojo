@@ -1,0 +1,576 @@
+---
+id: "11"
+slug: "advanced-channels"
+title: "Advanced Channels"
+description: "Discord, Slack, and iMessage integration"
+tier: "free"
+level: 2
+estimatedTime: "40 min"
+---
+
+# Advanced Channels
+
+Expand beyond WhatsApp and Telegram. Connect your AI agent to Discord, Slack, email, and more to reach users wherever they are.
+
+## What You'll Learn
+
+- ✅ Set up Discord bot integration
+- ✅ Configure Slack app with slash commands
+- ✅ Enable email integration (SMTP/IMAP)
+- ✅ Multi-channel message routing
+- ✅ Channel-specific customization
+
+## Prerequisites
+
+Complete Modules 4 and 5 (WhatsApp and Telegram setup) before starting this module.
+
+---
+
+## Step 1: Discord Bot Integration
+
+### Create Discord Bot
+
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+2. Click "New Application"
+3. Name it (e.g., "OpenClaw Bot")
+4. Go to "Bot" tab → "Add Bot"
+5. Copy the bot token
+
+### Configure OpenClaw for Discord
+
+```bash
+nano .env
+```
+
+Add Discord credentials:
+
+```bash
+DISCORD_BOT_TOKEN=your_bot_token_here
+DISCORD_CLIENT_ID=your_client_id_here
+```
+
+### Enable Discord Channel
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+Add Discord configuration:
+
+```json
+{
+  "channels": {
+    "discord": {
+      "enabled": true,
+      "token": "${DISCORD_BOT_TOKEN}",
+      "prefix": "!",  // Command prefix
+      "status": "online",
+      "activity": {
+        "type": "LISTENING",
+        "name": "your commands"
+      }
+    }
+  }
+}
+```
+
+### Invite Bot to Server
+
+1. Go to OAuth2 → URL Generator
+2. Select scopes: `bot`, `applications.commands`
+3. Select permissions: `Send Messages`, `Read Messages`, `Manage Messages`
+4. Copy generated URL and open in browser
+5. Select your server and authorize
+
+### Test Discord Bot
+
+Restart OpenClaw:
+
+```bash
+openclaw restart
+```
+
+In Discord:
+
+```
+You: !help
+Bot: Available commands:
+- !ask [question] - Ask me anything
+- !weather [city] - Get weather info
+- !help - Show this message
+```
+
+---
+
+## Step 2: Slack App Integration
+
+### Create Slack App
+
+1. Go to [Slack API](https://api.slack.com/apps)
+2. Click "Create New App" → "From scratch"
+3. Name it and select workspace
+4. Go to "OAuth & Permissions"
+5. Add scopes: `chat:write`, `commands`, `im:history`
+6. Install app to workspace
+7. Copy Bot User OAuth Token
+
+### Configure OpenClaw for Slack
+
+```bash
+nano .env
+```
+
+Add Slack credentials:
+
+```bash
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+SLACK_SIGNING_SECRET=your_signing_secret
+SLACK_APP_TOKEN=xapp-your-app-token
+```
+
+### Enable Slack Channel
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+```json
+{
+  "channels": {
+    "slack": {
+      "enabled": true,
+      "botToken": "${SLACK_BOT_TOKEN}",
+      "signingSecret": "${SLACK_SIGNING_SECRET}",
+      "appToken": "${SLACK_APP_TOKEN}",
+      "socketMode": true
+    }
+  }
+}
+```
+
+### Create Slash Commands
+
+In Slack App settings:
+1. Go to "Slash Commands"
+2. Create new command: `/ask`
+3. Request URL: `https://your-domain.com/slack/commands`
+4. Description: "Ask the AI assistant"
+
+### Test Slack Integration
+
+Restart OpenClaw:
+
+```bash
+openclaw restart
+```
+
+In Slack:
+
+```
+You: /ask What's the weather today?
+Bot: The weather today is sunny with a temperature of 22°C
+```
+
+---
+
+## Step 3: Email Integration
+
+### Configure SMTP (Outgoing)
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+Add email configuration:
+
+```json
+{
+  "channels": {
+    "email": {
+      "enabled": true,
+      "smtp": {
+        "host": "smtp.gmail.com",
+        "port": 587,
+        "secure": false,
+        "auth": {
+          "user": "${EMAIL_USER}",
+          "pass": "${EMAIL_PASSWORD}"
+        }
+      },
+      "from": {
+        "name": "OpenClaw Assistant",
+        "address": "bot@yourdomain.com"
+      }
+    }
+  }
+}
+```
+
+### Configure IMAP (Incoming)
+
+```json
+{
+  "channels": {
+    "email": {
+      "imap": {
+        "enabled": true,
+        "host": "imap.gmail.com",
+        "port": 993,
+        "secure": true,
+        "auth": {
+          "user": "${EMAIL_USER}",
+          "pass": "${EMAIL_PASSWORD}"
+        },
+        "pollInterval": 60000  // Check every minute
+      }
+    }
+  }
+}
+```
+
+### Gmail App Password
+
+For Gmail:
+1. Enable 2FA on your Google account
+2. Go to Security → App Passwords
+3. Generate password for "Mail"
+4. Use this in `.env`:
+
+```bash
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-app-password
+```
+
+### Test Email
+
+```bash
+# Send test email
+openclaw email send --to "test@example.com" --subject "Test" --body "Hello from OpenClaw"
+
+# Check inbox
+openclaw email check
+```
+
+---
+
+## Step 4: Multi-Channel Routing
+
+Route messages intelligently across channels.
+
+### Configure Routing Rules
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+```json
+{
+  "routing": {
+    "rules": [
+      {
+        "name": "urgent_to_whatsapp",
+        "condition": "message.priority === 'urgent'",
+        "channels": ["whatsapp"]
+      },
+      {
+        "name": "reports_to_email",
+        "condition": "message.type === 'report'",
+        "channels": ["email"]
+      },
+      {
+        "name": "team_to_slack",
+        "condition": "message.tags.includes('team')",
+        "channels": ["slack"]
+      }
+    ],
+    "fallback": ["telegram"]  // Default channel
+  }
+}
+```
+
+### Cross-Channel Forwarding
+
+```json
+{
+  "forwarding": {
+    "enabled": true,
+    "rules": [
+      {
+        "from": "email",
+        "to": "slack",
+        "condition": "subject.includes('[URGENT]')"
+      },
+      {
+        "from": "discord",
+        "to": "whatsapp",
+        "condition": "author.id === 'admin_id'"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Step 5: Channel-Specific Customization
+
+### Per-Channel Personalities
+
+```json
+{
+  "channels": {
+    "discord": {
+      "personality": {
+        "tone": "casual",
+        "emoji": true,
+        "markdown": true
+      }
+    },
+    "slack": {
+      "personality": {
+        "tone": "professional",
+        "emoji": false,
+        "markdown": false
+      }
+    },
+    "email": {
+      "personality": {
+        "tone": "formal",
+        "signature": "Best regards,\nOpenClaw Assistant"
+      }
+    }
+  }
+}
+```
+
+### Channel-Specific Commands
+
+```bash
+nano ~/.openclaw/channels/discord/commands.json
+```
+
+```json
+{
+  "commands": [
+    {
+      "name": "meme",
+      "description": "Generate a meme",
+      "discordOnly": true,
+      "handler": "generateMeme"
+    },
+    {
+      "name": "poll",
+      "description": "Create a poll",
+      "discordOnly": true,
+      "handler": "createPoll"
+    }
+  ]
+}
+```
+
+---
+
+## Verification
+
+Test all channels:
+
+```bash
+# Check channel status
+openclaw channels status
+
+# Should show:
+# ✓ WhatsApp: Connected
+# ✓ Telegram: Connected
+# ✓ Discord: Connected
+# ✓ Slack: Connected
+# ✓ Email: Connected
+
+# Test specific channel
+openclaw channels test discord
+
+# View channel logs
+openclaw logs channels
+```
+
+---
+
+## Common Issues
+
+### "Discord bot not responding"
+
+**Check:**
+1. Bot has proper permissions in server
+2. Bot is online (check Discord server member list)
+3. Command prefix is correct
+
+**Fix:**
+
+```bash
+# Check Discord connection
+openclaw channels test discord
+
+# View Discord logs
+openclaw logs discord
+```
+
+### "Slack slash command not working"
+
+**Verify:**
+1. Request URL is accessible
+2. Signing secret matches
+3. Socket mode is enabled
+
+**Debug:**
+
+```bash
+# Enable Slack debug logging
+openclaw config set channels.slack.debug true
+
+# Test Slack connection
+openclaw channels test slack
+```
+
+### "Email not sending"
+
+**Common issues:**
+- Wrong SMTP credentials
+- Port blocked by firewall
+- Gmail blocking "less secure apps"
+
+**Solution:**
+
+```bash
+# Test SMTP connection
+openclaw email test-smtp
+
+# Check email logs
+openclaw logs email
+```
+
+### "Messages not routing correctly"
+
+**Debug routing:**
+
+```bash
+# Test routing rules
+openclaw routing test --message '{"priority":"urgent"}'
+
+# View routing logs
+openclaw logs routing
+```
+
+---
+
+## Advanced Features
+
+### 1. **Discord Embeds**
+
+```javascript
+// ~/.openclaw/channels/discord/embeds.js
+module.exports = {
+  createWeatherEmbed: (data) => ({
+    color: 0x0099ff,
+    title: `Weather in ${data.city}`,
+    fields: [
+      { name: 'Temperature', value: `${data.temp}°C`, inline: true },
+      { name: 'Condition', value: data.condition, inline: true }
+    ],
+    timestamp: new Date()
+  })
+};
+```
+
+### 2. **Slack Interactive Messages**
+
+```json
+{
+  "channels": {
+    "slack": {
+      "interactive": {
+        "enabled": true,
+        "buttons": [
+          {
+            "text": "Approve",
+            "action": "approve_request",
+            "style": "primary"
+          },
+          {
+            "text": "Reject",
+            "action": "reject_request",
+            "style": "danger"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+### 3. **Email Templates**
+
+```bash
+nano ~/.openclaw/templates/email/welcome.html
+```
+
+```html
+<!DOCTYPE html>
+<html>
+<body>
+  <h1>Welcome {{name}}!</h1>
+  <p>Your OpenClaw assistant is ready.</p>
+  <a href="{{dashboard_url}}">Go to Dashboard</a>
+</body>
+</html>
+```
+
+---
+
+## Best Practices
+
+1. **Use appropriate channels** - Urgent → WhatsApp, Reports → Email
+2. **Customize per platform** - Discord can be casual, Slack professional
+3. **Implement rate limiting** - Prevent spam across all channels
+4. **Log everything** - Debug multi-channel issues easily
+5. **Test thoroughly** - Each platform has quirks
+6. **Monitor uptime** - Set up alerts for channel disconnections
+
+---
+
+## Real-World Examples
+
+### 1. **Customer Support Bot**
+
+```
+Discord: Community questions
+Slack: Internal team coordination
+Email: Formal support tickets
+WhatsApp: Urgent customer issues
+```
+
+### 2. **DevOps Alerts**
+
+```
+Slack: Build notifications
+Email: Weekly reports
+Discord: Team chat
+Telegram: Personal alerts
+```
+
+### 3. **Content Distribution**
+
+```
+Email: Newsletter
+Slack: Team updates
+Discord: Community announcements
+Twitter: Public posts (via API)
+```
+
+---
+
+## Next Steps
+
+Your agent is now omnichannel! 
+
+**Continue to Module 12:** [Security Basics](/learn/security-basics) to protect your multi-channel deployment.
+
+**Need help?** Join the [Discord community](https://discord.com) for support.

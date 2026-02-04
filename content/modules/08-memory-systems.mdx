@@ -1,0 +1,394 @@
+---
+id: "08"
+slug: "memory-systems"
+title: "Memory Systems"
+description: "Configure short-term, long-term, and vector memory"
+tier: "free"
+level: 2
+estimatedTime: "25 min"
+---
+
+# Memory Systems
+
+Give your AI agent the ability to remember conversations, learn from interactions, and recall information contextually. OpenClaw supports three types of memory that work together to create intelligent, context-aware agents.
+
+## What You'll Learn
+
+- ✅ Configure short-term memory for conversation context
+- ✅ Set up long-term memory with persistent storage
+- ✅ Enable vector memory for semantic search
+- ✅ Optimize memory performance and costs
+
+## Prerequisites
+
+Complete Module 6 (Testing Your Setup) before starting this module.
+
+---
+
+## Understanding Memory Types
+
+### Short-Term Memory (Conversation Context)
+Keeps track of the current conversation. Automatically managed by OpenClaw.
+
+**Use case:** "Remember what we talked about 5 minutes ago"
+
+### Long-Term Memory (Persistent Storage)
+Stores information across conversations. Uses SQLite or PostgreSQL.
+
+**Use case:** "What's my favorite color?" (asked days later)
+
+### Vector Memory (Semantic Search)
+Finds similar information using embeddings. Powered by AI models.
+
+**Use case:** "Find all conversations about deployment issues"
+
+---
+
+## Step 1: Configure Short-Term Memory
+
+Short-term memory is enabled by default. Configure the context window size:
+
+```bash
+# Edit your .env file
+nano .env
+```
+
+Add or update:
+
+```bash
+# Short-term memory settings
+CONTEXT_WINDOW_SIZE=10  # Number of messages to remember
+MAX_TOKENS_PER_MESSAGE=2000
+```
+
+**What this does:**
+- `CONTEXT_WINDOW_SIZE`: How many previous messages to include
+- `MAX_TOKENS_PER_MESSAGE`: Maximum length per message
+
+**Restart OpenClaw:**
+
+```bash
+openclaw restart
+```
+
+---
+
+## Step 2: Enable Long-Term Memory
+
+Long-term memory requires a database. OpenClaw supports SQLite (simple) and PostgreSQL (production).
+
+### Option A: SQLite (Recommended for Testing)
+
+```bash
+# Edit config
+nano ~/.openclaw/config.json
+```
+
+Add memory configuration:
+
+```json
+{
+  "memory": {
+    "longTerm": {
+      "enabled": true,
+      "type": "sqlite",
+      "path": "~/.openclaw/memory.db"
+    }
+  }
+}
+```
+
+### Option B: PostgreSQL (Production)
+
+First, install PostgreSQL:
+
+```bash
+# Ubuntu/Debian
+sudo apt install postgresql postgresql-contrib
+
+# Start service
+sudo systemctl start postgresql
+```
+
+Create database:
+
+```bash
+sudo -u postgres psql
+CREATE DATABASE openclaw_memory;
+CREATE USER openclaw WITH PASSWORD 'your_secure_password';
+GRANT ALL PRIVILEGES ON DATABASE openclaw_memory TO openclaw;
+\q
+```
+
+Update config:
+
+```json
+{
+  "memory": {
+    "longTerm": {
+      "enabled": true,
+      "type": "postgresql",
+      "connection": {
+        "host": "localhost",
+        "port": 5432,
+        "database": "openclaw_memory",
+        "user": "openclaw",
+        "password": "your_secure_password"
+      }
+    }
+  }
+}
+```
+
+**Restart OpenClaw:**
+
+```bash
+openclaw restart
+```
+
+---
+
+## Step 3: Enable Vector Memory
+
+Vector memory uses embeddings to find semantically similar information.
+
+### Install Dependencies
+
+```bash
+# OpenClaw will use your AI provider's embeddings
+# No additional installation needed
+```
+
+### Configure Vector Memory
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+Add vector memory settings:
+
+```json
+{
+  "memory": {
+    "vector": {
+      "enabled": true,
+      "provider": "anthropic",  // or "openai"
+      "model": "claude-3-haiku-20240307",
+      "dimensions": 1024,
+      "similarityThreshold": 0.7
+    }
+  }
+}
+```
+
+**Settings explained:**
+- `provider`: Which AI service to use for embeddings
+- `model`: Embedding model (Haiku is fast and cheap)
+- `dimensions`: Vector size (1024 for Claude, 1536 for OpenAI)
+- `similarityThreshold`: Minimum similarity score (0-1)
+
+**Restart OpenClaw:**
+
+```bash
+openclaw restart
+```
+
+---
+
+## Step 4: Test Memory Systems
+
+### Test Short-Term Memory
+
+Send messages to your agent:
+
+```
+You: My favorite color is blue
+Agent: Got it! I'll remember that.
+
+You: What's my favorite color?
+Agent: Your favorite color is blue!
+```
+
+### Test Long-Term Memory
+
+1. Have a conversation with your agent
+2. Restart OpenClaw: `openclaw restart`
+3. Ask about the previous conversation
+
+```
+You: Do you remember what we talked about earlier?
+Agent: Yes! We discussed [previous topic]
+```
+
+### Test Vector Memory
+
+Store multiple pieces of information:
+
+```
+You: Remember: I deployed OpenClaw on DigitalOcean
+You: Remember: I had an issue with WhatsApp authentication
+You: Remember: I fixed it by regenerating the QR code
+```
+
+Later, search semantically:
+
+```
+You: Find all my deployment notes
+Agent: I found 3 related memories:
+1. Deployed on DigitalOcean
+2. WhatsApp auth issue
+3. QR code regeneration fix
+```
+
+---
+
+## Verification
+
+Check that all memory systems are working:
+
+```bash
+# Check memory status
+openclaw memory status
+
+# Should show:
+# ✓ Short-term: Active (10 messages)
+# ✓ Long-term: Active (SQLite/PostgreSQL)
+# ✓ Vector: Active (Anthropic/OpenAI)
+```
+
+View memory contents:
+
+```bash
+# List stored memories
+openclaw memory list
+
+# Search memories
+openclaw memory search "deployment"
+```
+
+---
+
+## Memory Best Practices
+
+### 1. **Start with SQLite**
+Use SQLite for development, PostgreSQL for production.
+
+### 2. **Tune Context Window**
+- Small (5-10): Faster, cheaper, less context
+- Large (20-30): Slower, expensive, more context
+
+### 3. **Manage Vector Costs**
+Vector embeddings cost money. Configure wisely:
+
+```json
+{
+  "memory": {
+    "vector": {
+      "autoEmbed": false,  // Manual control
+      "maxStoredVectors": 1000  // Limit storage
+    }
+  }
+}
+```
+
+### 4. **Regular Cleanup**
+Old memories can slow down your agent:
+
+```bash
+# Delete memories older than 30 days
+openclaw memory cleanup --older-than 30d
+
+# Clear all memories (careful!)
+openclaw memory clear --confirm
+```
+
+---
+
+## Common Issues
+
+### "Memory database not found"
+
+**Solution:** Initialize the database:
+
+```bash
+openclaw memory init
+```
+
+### "Vector embeddings failing"
+
+**Check:**
+1. API key is valid: `echo $ANTHROPIC_API_KEY`
+2. Model name is correct in config
+3. You have API credits remaining
+
+**Fix:**
+
+```bash
+# Test embeddings manually
+openclaw memory test-vector "test message"
+```
+
+### "Out of memory errors"
+
+**Reduce memory usage:**
+
+```json
+{
+  "memory": {
+    "longTerm": {
+      "maxEntries": 5000,  // Limit stored memories
+      "pruneOldest": true
+    }
+  }
+}
+```
+
+### "Slow response times"
+
+**Optimize:**
+1. Reduce context window size
+2. Disable vector memory for simple bots
+3. Use PostgreSQL instead of SQLite for large datasets
+
+---
+
+## Performance Tips
+
+### Database Indexing
+
+For PostgreSQL, add indexes:
+
+```sql
+-- Connect to database
+psql -U openclaw -d openclaw_memory
+
+-- Add indexes
+CREATE INDEX idx_memory_timestamp ON memories(created_at);
+CREATE INDEX idx_memory_user ON memories(user_id);
+```
+
+### Memory Caching
+
+Enable caching for frequently accessed memories:
+
+```json
+{
+  "memory": {
+    "cache": {
+      "enabled": true,
+      "ttl": 3600,  // 1 hour
+      "maxSize": 100  // entries
+    }
+  }
+}
+```
+
+---
+
+## Next Steps
+
+Your agent now has a complete memory system! 
+
+**Continue to Module 9:** [Network Integration](/learn/network-integration) to connect your agent to external APIs and webhooks.
+
+**Need help?** Join the [Discord community](https://discord.com) or check the [troubleshooting guide](/learn/common-errors).

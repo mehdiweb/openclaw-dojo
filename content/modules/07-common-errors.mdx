@@ -1,0 +1,155 @@
+---
+id: "07"
+slug: "common-errors"
+title: "Common Errors & Fixes"
+description: "Troubleshoot the most frequent deployment issues"
+tier: "free"
+level: 1
+estimatedTime: "15 min"
+---
+
+# Common Errors & Fixes
+
+This module covers the most common issues and their fixes.
+
+## Error: "No auth configured"
+
+**Meaning:** Your API key isn't set up correctly.
+
+**Fix:**
+```bash
+openclaw onboard
+```
+
+Re-run the wizard and enter your API key.
+
+## Error: "Gateway not running"
+
+**Meaning:** The background service stopped.
+
+**Fix 1 - Start manually:**
+```bash
+openclaw gateway
+```
+
+**Fix 2 - Check service:**
+```bash
+# Linux (systemd)
+sudo systemctl status openclaw
+sudo systemctl restart openclaw
+
+# macOS (launchd)
+launchctl list | grep openclaw
+launchctl kickstart -k system/openclaw
+```
+
+## Error: "Not linked" (WhatsApp)
+
+**Meaning:** WhatsApp Web session expired.
+
+**Fix:**
+```bash
+openclaw channels login
+```
+
+Scan the QR code again.
+
+## Error: "Pairing required"
+
+**Meaning:** New sender needs approval.
+
+**Fix:**
+```bash
+# List pending codes
+openclaw pairing list whatsapp
+
+# Approve
+openclaw pairing approve whatsapp ABC123
+```
+
+## Error: "Invalid token" (Telegram)
+
+**Meaning:** Bot token is wrong or revoked.
+
+**Fix:**
+1. Get new token from @BotFather: `/token`
+2. Edit config: `nano ~/.openclaw/openclaw.json`
+3. Update token
+4. Restart: `openclaw gateway restart`
+
+## Error: "Permission denied" (Service)
+
+**Meaning:** Can't install system service.
+
+**Fix - Manual service:**
+
+Create file `/etc/systemd/system/openclaw.service`:
+
+```ini
+[Unit]
+Description=OpenClaw Gateway
+After=network.target
+
+[Service]
+Type=simple
+User=yourusername
+ExecStart=/usr/bin/openclaw gateway
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable:
+```bash
+sudo systemctl enable openclaw
+sudo systemctl start openclaw
+```
+
+## Error: Slow responses (>60 seconds)
+
+**Possible causes:**
+1. **Low server specs** → Upgrade VPS (2GB+ RAM)
+2. **API throttling** → Check API dashboard
+3. **Network issues** → Check `ping api.anthropic.com`
+
+## Error: "Bun runtime detected"
+
+**Meaning:** Using Bun instead of Node.js
+
+**Fix:**
+```bash
+# Check
+node --version
+
+# If using Bun, switch:
+npm install -g openclaw@latest
+openclaw gateway
+```
+
+## Error: Can't access dashboard remotely
+
+**Cause:** Gateway only binds to localhost (127.0.0.1) by default for security.
+
+**Fix 1 - SSH Tunnel (Recommended):**
+```bash
+ssh -L 18789:localhost:18789 your-vps-ip
+```
+
+Then access: `http://localhost:18789`
+
+**Fix 2 - Expose publicly (NOT RECOMMENDED):**
+Edit config to bind to `0.0.0.0` (security risk!)
+
+## Getting More Help
+
+If you're still stuck:
+
+1. **Check logs:** `openclaw logs --follow`
+2. **Search Discord:** Common issues are already solved
+3. **Ask community:** Share your error message
+4. **Hire help:** Professional installation available
+
+## Next Modules
+
+Continue to Module 8 for advanced features like memory systems and custom tools.

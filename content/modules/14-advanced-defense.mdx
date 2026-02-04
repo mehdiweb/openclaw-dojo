@@ -1,0 +1,605 @@
+---
+id: "14"
+slug: "advanced-defense"
+title: "Advanced Defense"
+description: "Implement security hardening and threat protection"
+tier: "builder"
+level: 3
+estimatedTime: "45 min"
+---
+
+# Advanced Defense
+
+🔒 **Builder Tier Module** - [Upgrade to access](/support)
+
+Take your security to production-grade levels. Implement DDoS protection, intrusion detection, encrypted communications, and advanced threat mitigation.
+
+## What You'll Learn
+
+- ✅ Configure DDoS protection and mitigation
+- ✅ Set up intrusion detection systems (IDS)
+- ✅ Enable end-to-end encryption
+- ✅ Implement audit logging and forensics
+- ✅ Advanced security scanning and hardening
+
+## Prerequisites
+
+Complete Module 12 (Security Basics) before starting this module.
+
+---
+
+## Step 1: DDoS Protection
+
+### Install and Configure Fail2Ban Advanced
+
+```bash
+# Install Fail2Ban
+sudo apt install fail2ban
+
+# Create OpenClaw filter
+sudo nano /etc/fail2ban/filter.d/openclaw.conf
+```
+
+```ini
+[Definition]
+failregex = ^.*Failed login attempt from <HOST>.*$
+            ^.*Rate limit exceeded from <HOST>.*$
+            ^.*Suspicious activity from <HOST>.*$
+ignoreregex =
+```
+
+### Configure Jail
+
+```bash
+sudo nano /etc/fail2ban/jail.d/openclaw.conf
+```
+
+```ini
+[openclaw-auth]
+enabled = true
+port = 3000,3001
+filter = openclaw
+logpath = /var/log/openclaw/security.log
+maxretry = 3
+findtime = 600
+bantime = 3600
+action = iptables-multiport[name=openclaw, port="3000,3001", protocol=tcp]
+
+[openclaw-ddos]
+enabled = true
+port = 3000,3001
+filter = openclaw
+logpath = /var/log/openclaw/access.log
+maxretry = 100
+findtime = 60
+bantime = 86400
+action = iptables-multiport[name=openclaw-ddos, port="3000,3001", protocol=tcp]
+```
+
+### Enable Rate Limiting at Network Level
+
+```bash
+# Install nginx as reverse proxy
+sudo apt install nginx
+
+# Configure rate limiting
+sudo nano /etc/nginx/sites-available/openclaw
+```
+
+```nginx
+limit_req_zone $binary_remote_addr zone=openclaw:10m rate=10r/s;
+limit_conn_zone $binary_remote_addr zone=addr:10m;
+
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    # Rate limiting
+    limit_req zone=openclaw burst=20 nodelay;
+    limit_conn addr 10;
+
+    # DDoS protection
+    client_body_timeout 5s;
+    client_header_timeout 5s;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+---
+
+## Step 2: Intrusion Detection System
+
+### Install OSSEC
+
+```bash
+# Download OSSEC
+wget https://github.com/ossec/ossec-hids/archive/3.7.0.tar.gz
+tar -xzf 3.7.0.tar.gz
+cd ossec-hids-3.7.0
+
+# Install
+sudo ./install.sh
+
+# Choose: local installation
+```
+
+### Configure OSSEC for OpenClaw
+
+```bash
+sudo nano /var/ossec/etc/ossec.conf
+```
+
+```xml
+<ossec_config>
+  <syscheck>
+    <directories check_all="yes">/home/user/.openclaw</directories>
+    <directories check_all="yes">/usr/local/bin/openclaw</directories>
+  </syscheck>
+
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/openclaw/security.log</location>
+  </localfile>
+
+  <active-response>
+    <command>firewall-drop</command>
+    <location>local</location>
+    <level>7</level>
+  </active-response>
+</ossec_config>
+```
+
+### Create Custom Rules
+
+```bash
+sudo nano /var/ossec/rules/openclaw_rules.xml
+```
+
+```xml
+<group name="openclaw">
+  <rule id="100001" level="5">
+    <decoded_as>openclaw</decoded_as>
+    <description>OpenClaw: Failed authentication</description>
+  </rule>
+
+  <rule id="100002" level="10">
+    <if_sid>100001</if_sid>
+    <match>multiple failed attempts</match>
+    <description>OpenClaw: Brute force attack detected</description>
+  </rule>
+
+  <rule id="100003" level="7">
+    <decoded_as>openclaw</decoded_as>
+    <match>SQL injection|command injection</match>
+    <description>OpenClaw: Injection attack attempt</description>
+  </rule>
+</group>
+```
+
+---
+
+## Step 3: End-to-End Encryption
+
+### Enable HTTPS with Let's Encrypt
+
+```bash
+# Install Certbot
+sudo apt install certbot python3-certbot-nginx
+
+# Get certificate
+sudo certbot --nginx -d your-domain.com
+
+# Auto-renewal
+sudo certbot renew --dry-run
+```
+
+### Configure OpenClaw for HTTPS
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+```json
+{
+  "server": {
+    "https": {
+      "enabled": true,
+      "port": 443,
+      "cert": "/etc/letsencrypt/live/your-domain.com/fullchain.pem",
+      "key": "/etc/letsencrypt/live/your-domain.com/privkey.pem",
+      "minVersion": "TLSv1.2",
+      "ciphers": [
+        "ECDHE-ECDSA-AES128-GCM-SHA256",
+        "ECDHE-RSA-AES128-GCM-SHA256",
+        "ECDHE-ECDSA-AES256-GCM-SHA384",
+        "ECDHE-RSA-AES256-GCM-SHA384"
+      ]
+    }
+  }
+}
+```
+
+### Encrypt Database Connections
+
+```json
+{
+  "database": {
+    "ssl": {
+      "enabled": true,
+      "rejectUnauthorized": true,
+      "ca": "/path/to/ca-cert.pem",
+      "cert": "/path/to/client-cert.pem",
+      "key": "/path/to/client-key.pem"
+    }
+  }
+}
+```
+
+### Encrypt API Keys at Rest
+
+```bash
+# Install encryption tool
+npm install -g @openclaw/vault
+
+# Initialize vault
+openclaw-vault init
+
+# Store encrypted keys
+openclaw-vault set ANTHROPIC_API_KEY "sk-ant-xxxxx"
+openclaw-vault set OPENAI_API_KEY "sk-xxxxx"
+
+# OpenClaw will auto-decrypt on startup
+```
+
+---
+
+## Step 4: Audit Logging & Forensics
+
+### Enable Comprehensive Logging
+
+```json
+{
+  "logging": {
+    "audit": {
+      "enabled": true,
+      "level": "verbose",
+      "logFile": "/var/log/openclaw/audit.log",
+      "rotate": {
+        "maxSize": "100M",
+        "maxFiles": 10,
+        "compress": true
+      },
+      "events": [
+        "authentication",
+        "authorization",
+        "data_access",
+        "configuration_change",
+        "security_event",
+        "api_call"
+      ]
+    }
+  }
+}
+```
+
+### Structured Logging
+
+```json
+{
+  "logging": {
+    "format": "json",
+    "fields": {
+      "timestamp": true,
+      "level": true,
+      "userId": true,
+      "ip": true,
+      "action": true,
+      "resource": true,
+      "result": true,
+      "duration": true
+    }
+  }
+}
+```
+
+### Centralized Log Management
+
+```bash
+# Install Elasticsearch + Kibana (ELK Stack)
+# Or use a service like Datadog, Splunk
+
+# Configure log shipping
+nano ~/.openclaw/config.json
+```
+
+```json
+{
+  "logging": {
+    "shipping": {
+      "enabled": true,
+      "destination": "elasticsearch",
+      "host": "localhost:9200",
+      "index": "openclaw-logs",
+      "batchSize": 100,
+      "flushInterval": 5000
+    }
+  }
+}
+```
+
+---
+
+## Step 5: Security Scanning & Hardening
+
+### Automated Vulnerability Scanning
+
+```bash
+# Install security scanner
+npm install -g snyk
+
+# Scan dependencies
+snyk test
+
+# Monitor continuously
+snyk monitor
+```
+
+### Container Security (if using Docker)
+
+```bash
+# Scan Docker image
+docker scan openclaw:latest
+
+# Use minimal base image
+# Dockerfile
+FROM node:18-alpine  # Minimal attack surface
+RUN apk add --no-cache dumb-init
+USER node  # Don't run as root
+```
+
+### File Integrity Monitoring
+
+```json
+{
+  "security": {
+    "fileIntegrity": {
+      "enabled": true,
+      "paths": [
+        "~/.openclaw/config.json",
+        "~/.openclaw/tools/",
+        "/usr/local/bin/openclaw"
+      ],
+      "checkInterval": 300000,  // 5 minutes
+      "alertOnChange": true
+    }
+  }
+}
+```
+
+---
+
+## Verification
+
+Run security audit:
+
+```bash
+# Comprehensive security check
+openclaw security audit --advanced
+
+# Should show:
+# ✓ DDoS protection active
+# ✓ IDS running (OSSEC)
+# ✓ HTTPS enabled
+# ✓ Encryption at rest
+# ✓ Audit logging active
+# ✓ No critical vulnerabilities
+
+# Penetration test
+openclaw security pentest --safe
+```
+
+---
+
+## Common Issues
+
+### "OSSEC not detecting intrusions"
+
+**Check logs:**
+
+```bash
+sudo tail -f /var/ossec/logs/ossec.log
+
+# Verify rules are loaded
+sudo /var/ossec/bin/ossec-logtest
+```
+
+### "Let's Encrypt certificate renewal failed"
+
+**Manual renewal:**
+
+```bash
+sudo certbot renew --force-renewal
+
+# Check certificate expiry
+sudo certbot certificates
+```
+
+### "High false positive rate"
+
+**Tune IDS rules:**
+
+```bash
+# Whitelist legitimate IPs
+sudo nano /var/ossec/etc/ossec.conf
+```
+
+```xml
+<global>
+  <white_list>203.0.113.0/24</white_list>
+</global>
+```
+
+---
+
+## Advanced Security Features
+
+### 1. **Web Application Firewall (WAF)**
+
+```nginx
+# ModSecurity with nginx
+load_module modules/ngx_http_modsecurity_module.so;
+
+http {
+    modsecurity on;
+    modsecurity_rules_file /etc/nginx/modsec/main.conf;
+}
+```
+
+### 2. **API Gateway with Authentication**
+
+```json
+{
+  "gateway": {
+    "enabled": true,
+    "authentication": {
+      "type": "jwt",
+      "secret": "${JWT_SECRET}",
+      "expiresIn": "1h"
+    },
+    "rateLimit": {
+      "windowMs": 60000,
+      "max": 100
+    }
+  }
+}
+```
+
+### 3. **Honeypot Deployment**
+
+```json
+{
+  "security": {
+    "honeypot": {
+      "enabled": true,
+      "endpoints": [
+        "/admin",
+        "/wp-admin",
+        "/.env"
+      ],
+      "action": "ban",
+      "banDuration": 86400000
+    }
+  }
+}
+```
+
+---
+
+## Security Monitoring Dashboard
+
+### Set Up Grafana
+
+```bash
+# Install Grafana
+sudo apt install grafana
+
+# Start service
+sudo systemctl start grafana-server
+
+# Access: http://localhost:3000
+# Default: admin/admin
+```
+
+### Import OpenClaw Security Dashboard
+
+```json
+{
+  "monitoring": {
+    "grafana": {
+      "enabled": true,
+      "url": "http://localhost:3000",
+      "apiKey": "${GRAFANA_API_KEY}",
+      "dashboards": [
+        "security-overview",
+        "threat-detection",
+        "audit-logs"
+      ]
+    }
+  }
+}
+```
+
+---
+
+## Compliance & Best Practices
+
+### GDPR Compliance
+
+```json
+{
+  "compliance": {
+    "gdpr": {
+      "enabled": true,
+      "dataRetention": 90,  // days
+      "anonymizeAfter": 365,
+      "rightToErasure": true,
+      "dataPortability": true
+    }
+  }
+}
+```
+
+### SOC 2 Requirements
+
+```json
+{
+  "compliance": {
+    "soc2": {
+      "auditLogging": true,
+      "accessControl": true,
+      "encryption": {
+        "atRest": true,
+        "inTransit": true
+      },
+      "backups": {
+        "enabled": true,
+        "frequency": "daily",
+        "retention": 30
+      }
+    }
+  }
+}
+```
+
+---
+
+## Security Checklist (Production)
+
+- [ ] DDoS protection configured
+- [ ] IDS/IPS deployed (OSSEC)
+- [ ] HTTPS with valid certificate
+- [ ] Database connections encrypted
+- [ ] API keys encrypted at rest
+- [ ] Audit logging enabled
+- [ ] Log shipping to SIEM
+- [ ] Vulnerability scanning automated
+- [ ] File integrity monitoring active
+- [ ] WAF deployed
+- [ ] Security monitoring dashboard
+- [ ] Incident response plan documented
+- [ ] Regular security audits scheduled
+
+---
+
+## Next Steps
+
+Your agent is now production-hardened! 
+
+**Continue to Module 15:** [Custom Tools](/learn/custom-tools) to build powerful custom functions for your agent.
+
+**Need help?** Contact support or join the [Discord community](https://discord.com).

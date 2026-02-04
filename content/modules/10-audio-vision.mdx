@@ -1,0 +1,528 @@
+---
+id: "10"
+slug: "audio-vision"
+title: "Audio & Vision"
+description: "Enable voice messages and image processing"
+tier: "free"
+level: 2
+estimatedTime: "35 min"
+---
+
+# Audio & Vision
+
+Transform your AI agent into a multimodal powerhouse. Process voice messages, analyze images, and generate audio responses.
+
+## What You'll Learn
+
+- ✅ Enable voice message transcription
+- ✅ Set up image processing and vision
+- ✅ Configure text-to-speech for audio responses
+- ✅ Handle file uploads and storage
+- ✅ Integrate Claude's vision capabilities
+
+## Prerequisites
+
+Complete Module 8 (Memory Systems) before starting this module.
+
+---
+
+## Understanding Multimodal AI
+
+OpenClaw supports:
+- **Speech-to-Text**: Transcribe voice messages
+- **Vision**: Analyze images, screenshots, documents
+- **Text-to-Speech**: Generate audio responses
+- **File Handling**: Store and process media files
+
+---
+
+## Step 1: Enable Voice Message Transcription
+
+### Install Whisper (OpenAI's Speech-to-Text)
+
+```bash
+# Install ffmpeg (required for audio processing)
+sudo apt install ffmpeg
+
+# OpenClaw will use OpenAI's Whisper API
+# Add your API key
+nano .env
+```
+
+Add:
+
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+### Configure Audio Processing
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+Add audio configuration:
+
+```json
+{
+  "audio": {
+    "transcription": {
+      "enabled": true,
+      "provider": "openai",
+      "model": "whisper-1",
+      "language": "en",
+      "autoTranscribe": true
+    },
+    "storage": {
+      "path": "~/.openclaw/audio",
+      "maxSize": 25,  // MB
+      "keepOriginal": false
+    }
+  }
+}
+```
+
+**Settings explained:**
+- `autoTranscribe`: Automatically transcribe incoming voice messages
+- `language`: Primary language (auto-detect if omitted)
+- `keepOriginal`: Save original audio files
+
+### Test Voice Transcription
+
+Restart OpenClaw:
+
+```bash
+openclaw restart
+```
+
+Send a voice message via WhatsApp:
+
+```
+[You send voice message: "Hello, what's the weather today?"]
+
+Agent: I heard you say: "Hello, what's the weather today?"
+The weather today is sunny with a temperature of 22°C.
+```
+
+---
+
+## Step 2: Enable Image Processing (Vision)
+
+### Configure Vision with Claude
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+Add vision configuration:
+
+```json
+{
+  "vision": {
+    "enabled": true,
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet-20241022",
+    "maxImageSize": 5,  // MB
+    "supportedFormats": ["jpg", "jpeg", "png", "gif", "webp"]
+  }
+}
+```
+
+### Set Up Image Storage
+
+```bash
+# Create images directory
+mkdir -p ~/.openclaw/images
+
+# Update config
+nano ~/.openclaw/config.json
+```
+
+```json
+{
+  "vision": {
+    "storage": {
+      "path": "~/.openclaw/images",
+      "keepImages": true,
+      "retention": 30  // days
+    }
+  }
+}
+```
+
+### Test Image Analysis
+
+Restart OpenClaw:
+
+```bash
+openclaw restart
+```
+
+Send an image via WhatsApp:
+
+```
+[You send image of a dog]
+
+Agent: I can see a golden retriever sitting in a park. The dog appears to be smiling and looks very friendly!
+```
+
+Ask questions about images:
+
+```
+[You send screenshot of code]
+
+You: What's wrong with this code?
+Agent: I can see a syntax error on line 5. You're missing a closing parenthesis...
+```
+
+---
+
+## Step 3: Enable Text-to-Speech
+
+### Configure TTS
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+Add TTS configuration:
+
+```json
+{
+  "tts": {
+    "enabled": true,
+    "provider": "elevenlabs",  // or "openai", "google"
+    "voice": "rachel",  // Voice ID
+    "model": "eleven_multilingual_v2",
+    "autoRespond": false  // Manual control
+  }
+}
+```
+
+### Get ElevenLabs API Key
+
+1. Sign up at [elevenlabs.io](https://elevenlabs.io)
+2. Get your API key
+3. Add to environment:
+
+```bash
+nano .env
+```
+
+```bash
+ELEVENLABS_API_KEY=your_elevenlabs_key_here
+```
+
+### Alternative: OpenAI TTS
+
+```json
+{
+  "tts": {
+    "enabled": true,
+    "provider": "openai",
+    "model": "tts-1",
+    "voice": "alloy"  // alloy, echo, fable, onyx, nova, shimmer
+  }
+}
+```
+
+### Test TTS
+
+```bash
+# Generate audio from text
+openclaw tts generate "Hello, this is a test" --output test.mp3
+
+# Play audio
+mpv test.mp3
+```
+
+In conversation:
+
+```
+You: Send me a voice message saying hello
+Agent: [Sends voice message with synthesized speech]
+```
+
+---
+
+## Step 4: Advanced Vision Features
+
+### Document Analysis
+
+Analyze PDFs, screenshots, diagrams:
+
+```json
+{
+  "vision": {
+    "features": {
+      "documentAnalysis": true,
+      "ocrEnabled": true,
+      "chartRecognition": true
+    }
+  }
+}
+```
+
+**Example usage:**
+
+```
+[You send screenshot of invoice]
+
+You: Extract the total amount from this invoice
+Agent: The total amount is $1,234.56
+```
+
+### Image Generation (DALL-E)
+
+```json
+{
+  "imageGeneration": {
+    "enabled": true,
+    "provider": "openai",
+    "model": "dall-e-3",
+    "size": "1024x1024",
+    "quality": "standard"
+  }
+}
+```
+
+**Example:**
+
+```
+You: Generate an image of a sunset over mountains
+Agent: [Sends generated image]
+```
+
+---
+
+## Step 5: File Handling & Storage
+
+### Configure File Uploads
+
+```json
+{
+  "files": {
+    "uploads": {
+      "enabled": true,
+      "maxSize": 20,  // MB
+      "allowedTypes": [
+        "image/*",
+        "audio/*",
+        "application/pdf",
+        "text/*"
+      ]
+    },
+    "storage": {
+      "provider": "local",  // or "s3", "gcs"
+      "path": "~/.openclaw/uploads",
+      "cleanup": {
+        "enabled": true,
+        "retentionDays": 7
+      }
+    }
+  }
+}
+```
+
+### Cloud Storage (Optional)
+
+For production, use S3 or Google Cloud Storage:
+
+```json
+{
+  "files": {
+    "storage": {
+      "provider": "s3",
+      "bucket": "openclaw-files",
+      "region": "us-east-1",
+      "credentials": {
+        "accessKeyId": "${AWS_ACCESS_KEY_ID}",
+        "secretAccessKey": "${AWS_SECRET_ACCESS_KEY}"
+      }
+    }
+  }
+}
+```
+
+---
+
+## Verification
+
+Test all multimodal features:
+
+```bash
+# Check audio status
+openclaw audio status
+
+# Check vision status
+openclaw vision status
+
+# List processed files
+openclaw files list
+
+# Test transcription
+openclaw audio transcribe test.mp3
+
+# Test vision
+openclaw vision analyze test.jpg
+```
+
+---
+
+## Common Issues
+
+### "Whisper transcription failed"
+
+**Check:**
+1. OpenAI API key is valid
+2. Audio file is supported format
+3. File size is under 25MB
+
+**Fix:**
+
+```bash
+# Convert audio to supported format
+ffmpeg -i input.m4a -ar 16000 output.mp3
+
+# Test manually
+openclaw audio transcribe output.mp3
+```
+
+### "Image too large"
+
+**Resize images automatically:**
+
+```json
+{
+  "vision": {
+    "autoResize": true,
+    "maxDimension": 2048
+  }
+}
+```
+
+### "Vision not working"
+
+**Check Claude API key:**
+
+```bash
+# Test vision manually
+openclaw vision test test.jpg
+```
+
+**Verify model supports vision:**
+
+```json
+{
+  "vision": {
+    "model": "claude-3-5-sonnet-20241022"  // Must be Sonnet or Opus
+  }
+}
+```
+
+### "TTS voice sounds robotic"
+
+**Use better quality:**
+
+```json
+{
+  "tts": {
+    "provider": "elevenlabs",
+    "model": "eleven_multilingual_v2",  // Better quality
+    "stability": 0.5,
+    "similarityBoost": 0.75
+  }
+}
+```
+
+---
+
+## Performance Optimization
+
+### Reduce Costs
+
+```json
+{
+  "audio": {
+    "transcription": {
+      "onlyWhenMentioned": true,  // Don't transcribe all voice messages
+      "minDuration": 2  // Ignore very short messages
+    }
+  },
+  "vision": {
+    "compressImages": true,
+    "quality": 80  // JPEG quality (1-100)
+  }
+}
+```
+
+### Faster Processing
+
+```json
+{
+  "audio": {
+    "transcription": {
+      "model": "whisper-1",  // Faster than larger models
+      "stream": true  // Stream results
+    }
+  }
+}
+```
+
+---
+
+## Real-World Examples
+
+### 1. **Voice-Controlled Assistant**
+
+```
+User: [Voice] "Remind me to call John at 3pm"
+Agent: Got it! I'll remind you to call John at 3pm today.
+```
+
+### 2. **Receipt Scanner**
+
+```
+User: [Sends photo of receipt]
+User: "Add this to my expenses"
+Agent: Added expense: $45.99 at Whole Foods on 2024-02-04
+```
+
+### 3. **Code Review from Screenshot**
+
+```
+User: [Sends screenshot of code]
+User: "Review this function"
+Agent: I see a few issues:
+1. Missing error handling on line 12
+2. Variable 'result' is never used
+3. Consider using async/await instead of promises
+```
+
+### 4. **Multilingual Voice Chat**
+
+```
+User: [Voice in Spanish] "¿Qué tiempo hace hoy?"
+Agent: [Voice in Spanish] "Hace sol con 25 grados"
+```
+
+---
+
+## Best Practices
+
+1. **Compress media files** - Reduce API costs
+2. **Set file retention policies** - Don't fill up storage
+3. **Use appropriate models** - Whisper-1 for speed, GPT-4V for accuracy
+4. **Implement rate limiting** - Prevent abuse
+5. **Cache transcriptions** - Don't re-transcribe same audio
+6. **Validate file types** - Security first
+
+---
+
+## Next Steps
+
+Your agent can now see and hear! 
+
+**Continue to Module 11:** [Advanced Channels](/learn/advanced-channels) to integrate Discord, Slack, and more platforms.
+
+**Need help?** Join the [Discord community](https://discord.com) for support.

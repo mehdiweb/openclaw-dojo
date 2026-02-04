@@ -1,0 +1,124 @@
+---
+id: "06"
+slug: "testing-setup"
+title: "Testing Your Setup"
+description: "Verify everything works with health checks and test messages"
+tier: "free"
+level: 1
+estimatedTime: "10 min"
+---
+
+# Testing Your Setup
+
+Before using your AI daily, let's run through verification checks.
+
+## Check 1: Gateway Status
+
+```bash
+openclaw status
+```
+
+Should show:
+- Gateway: running
+- WhatsApp: linked (if you set it up)
+- Telegram: connected (if you set it up)
+
+## Check 2: Health Check
+
+```bash
+openclaw health
+```
+
+This pings the running gateway. Should return "healthy" or green checkmarks.
+
+If not, check: `openclaw logs --follow`
+
+## Check 3: Security Audit
+
+```bash
+openclaw security audit --deep
+```
+
+This checks for common security issues. Review any warnings.
+
+## Check 4: Send Test Message
+
+Send a test via CLI:
+
+```bash
+openclaw message send --target +15551234567 --message "Hello from OpenClaw"
+```
+
+Replace with your actual phone number.
+
+**Should:** Send a WhatsApp message to yourself.
+
+## Check 5: Dashboard Access
+
+Open browser:
+```
+http://127.0.0.1:18789/
+```
+
+**If you see:** Control UI with chat interface → ✅ Working
+
+**If you see:** Token request → Paste your gateway token (from onboarding)
+
+**If you see:** Nothing/Error → Check gateway is running
+
+## Check 6: AI Response Test
+
+Send a message to your bot (via WhatsApp or Telegram):
+
+Try: "Hello, can you help me with something?"
+
+**Expected:** AI responds within 10-30 seconds
+
+**If no response:**
+1. Check `openclaw logs --follow` for errors
+2. Verify API key is valid (check Anthropic/OpenAI dashboard)
+3. Make sure you have API credits remaining
+
+## Check 7: Check API Credits
+
+Make sure you have funds:
+
+- **Anthropic:** https://console.anthropic.com/settings/billing
+- **OpenAI:** https://platform.openai.com/usage
+
+If balance is $0, add a payment method.
+
+## Common "Not Working" Issues
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| No AI response | No API credits | Add payment to Anthropic/OpenAI |
+| "No auth" error | API key not set | Re-run `openclaw onboard` |
+| Gateway not running | Service stopped | `openclaw gateway` or restart service |
+| Can't access dashboard | Wrong URL | Use `http://127.0.0.1:18789/` |
+| WhatsApp not linked | QR expired | `openclaw channels login` again |
+| Telegram not responding | Wrong token | Check config, restart gateway |
+
+## Performance Expectations
+
+**Normal response time:** 5-30 seconds depending on:
+- Complexity of your question
+- Current API load
+- Your internet connection
+
+**If consistently slow (>60 seconds):**
+- Check your VPS specs (2GB RAM minimum recommended)
+- Consider upgrading your server
+- Check `openclaw logs` for timeouts
+
+## You're Ready!
+
+If all checks pass, you're ready to use your AI assistant!
+
+## Next Steps
+
+- **Module 7:** Common errors and fixes
+- **Module 8:** Memory systems
+- **Module 9:** Network integration
+
+Or jump to **Builder tier** for advanced features.

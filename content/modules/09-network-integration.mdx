@@ -1,0 +1,579 @@
+---
+id: "09"
+slug: "network-integration"
+title: "Network Integration"
+description: "Connect to external APIs and webhooks"
+tier: "free"
+level: 2
+estimatedTime: "30 min"
+---
+
+# Network Integration
+
+Connect your AI agent to the outside world. Make HTTP requests, consume APIs, and respond to webhooks to create powerful integrations.
+
+## What You'll Learn
+
+- ✅ Configure HTTP client for API calls
+- ✅ Set up webhook endpoints
+- ✅ Handle authentication (API keys, OAuth)
+- ✅ Implement rate limiting and retries
+- ✅ Real-world examples (Weather, News, Custom APIs)
+
+## Prerequisites
+
+Complete Module 6 (Testing Your Setup) before starting this module.
+
+---
+
+## Understanding Network Integration
+
+OpenClaw can:
+- **Make HTTP requests** to external APIs
+- **Receive webhooks** from external services
+- **Handle authentication** automatically
+- **Retry failed requests** with exponential backoff
+
+---
+
+## Step 1: Enable HTTP Client
+
+The HTTP client is built into OpenClaw. Configure it:
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+Add network settings:
+
+```json
+{
+  "network": {
+    "http": {
+      "enabled": true,
+      "timeout": 30000,
+      "maxRetries": 3,
+      "retryDelay": 1000
+    }
+  }
+}
+```
+
+**Settings explained:**
+- `timeout`: Request timeout in milliseconds
+- `maxRetries`: Number of retry attempts
+- `retryDelay`: Initial delay between retries (ms)
+
+---
+
+## Step 2: Connect to a Weather API
+
+Let's integrate a real API. We'll use OpenWeatherMap (free tier).
+
+### Get API Key
+
+1. Sign up at [openweathermap.org](https://openweathermap.org/api)
+2. Get your free API key
+3. Add to environment:
+
+```bash
+nano .env
+```
+
+Add:
+
+```bash
+OPENWEATHER_API_KEY=your_api_key_here
+```
+
+### Configure the Tool
+
+```bash
+nano ~/.openclaw/tools/weather.json
+```
+
+Create the weather tool:
+
+```json
+{
+  "name": "get_weather",
+  "description": "Get current weather for a city",
+  "parameters": {
+    "city": {
+      "type": "string",
+      "description": "City name (e.g., 'London', 'New York')",
+      "required": true
+    }
+  },
+  "http": {
+    "method": "GET",
+    "url": "https://api.openweathermap.org/data/2.5/weather",
+    "params": {
+      "q": "{city}",
+      "appid": "${OPENWEATHER_API_KEY}",
+      "units": "metric"
+    }
+  },
+  "response": {
+    "format": "The weather in {city} is {weather[0].description} with a temperature of {main.temp}°C"
+  }
+}
+```
+
+### Test It
+
+Restart OpenClaw:
+
+```bash
+openclaw restart
+```
+
+Ask your agent:
+
+```
+You: What's the weather in London?
+Agent: The weather in London is partly cloudy with a temperature of 15°C
+```
+
+---
+
+## Step 3: Set Up Webhooks
+
+Webhooks allow external services to send data to your agent.
+
+### Enable Webhook Server
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+Add webhook configuration:
+
+```json
+{
+  "webhooks": {
+    "enabled": true,
+    "port": 3001,
+    "path": "/webhook",
+    "secret": "your_webhook_secret_here"
+  }
+}
+```
+
+### Create a Webhook Handler
+
+```bash
+nano ~/.openclaw/webhooks/github.js
+```
+
+Example GitHub webhook handler:
+
+```javascript
+module.exports = {
+  name: 'github_push',
+  
+  // Verify webhook signature
+  verify: (req, secret) => {
+    const signature = req.headers['x-hub-signature-256'];
+    const hash = crypto
+      .createHmac('sha256', secret)
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+    return signature === `sha256=${hash}`;
+  },
+  
+  // Handle the webhook
+  handle: async (data) => {
+    const { repository, commits } = data;
+    
+    // Send notification to WhatsApp
+    await openclaw.sendMessage({
+      to: 'your_number',
+      message: `New push to ${repository.name}: ${commits.length} commits`
+    });
+  }
+};
+```
+
+### Expose Webhook Publicly
+
+Use ngrok for testing:
+
+```bash
+# Install ngrok
+npm install -g ngrok
+
+# Expose port 3001
+ngrok http 3001
+```
+
+Copy the ngrok URL (e.g., `https://abc123.ngrok.io`) and configure it in GitHub:
+- Go to your repo → Settings → Webhooks
+- Add webhook: `https://abc123.ngrok.io/webhook`
+- Secret: Use your `webhook_secret`
+
+---
+
+## Step 4: Add News API Integration
+
+Let's add another real-world example.
+
+### Get NewsAPI Key
+
+1. Sign up at [newsapi.org](https://newsapi.org)
+2. Get your free API key
+
+```bash
+nano .env
+```
+
+Add:
+
+```bash
+NEWS_API_KEY=your_news_api_key_here
+```
+
+### Create News Tool
+
+```bash
+nano ~/.openclaw/tools/news.json
+```
+
+```json
+{
+  "name": "get_news",
+  "description": "Get latest news headlines",
+  "parameters": {
+    "topic": {
+      "type": "string",
+      "description": "News topic (e.g., 'technology', 'business')",
+      "required": true
+    },
+    "count": {
+      "type": "number",
+      "description": "Number of articles (max 5)",
+      "default": 3
+    }
+  },
+  "http": {
+    "method": "GET",
+    "url": "https://newsapi.org/v2/top-headlines",
+    "params": {
+      "q": "{topic}",
+      "apiKey": "${NEWS_API_KEY}",
+      "pageSize": "{count}"
+    }
+  },
+  "response": {
+    "format": "Here are the latest {topic} news:\n{articles[*].title}"
+  }
+}
+```
+
+### Test It
+
+```
+You: Get me 3 technology news articles
+Agent: Here are the latest technology news:
+1. Apple announces new AI features
+2. Google releases Gemini 2.0
+3. Tesla's autonomous driving update
+```
+
+---
+
+## Step 5: Authentication Patterns
+
+### API Key Authentication
+
+Already covered above. Add to `.env`:
+
+```bash
+API_NAME_KEY=your_key_here
+```
+
+Reference in tool config:
+
+```json
+{
+  "http": {
+    "headers": {
+      "Authorization": "Bearer ${API_NAME_KEY}"
+    }
+  }
+}
+```
+
+### OAuth 2.0
+
+For services like Google, Twitter, etc:
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+```json
+{
+  "oauth": {
+    "google": {
+      "clientId": "${GOOGLE_CLIENT_ID}",
+      "clientSecret": "${GOOGLE_CLIENT_SECRET}",
+      "redirectUri": "http://localhost:3001/oauth/callback",
+      "scopes": ["https://www.googleapis.com/auth/calendar"]
+    }
+  }
+}
+```
+
+Start OAuth flow:
+
+```bash
+openclaw oauth start google
+```
+
+### Basic Auth
+
+```json
+{
+  "http": {
+    "auth": {
+      "username": "${API_USERNAME}",
+      "password": "${API_PASSWORD}"
+    }
+  }
+}
+```
+
+---
+
+## Step 6: Rate Limiting & Retries
+
+Protect your API keys and handle failures gracefully.
+
+### Configure Rate Limits
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+```json
+{
+  "network": {
+    "rateLimits": {
+      "openweather": {
+        "maxRequests": 60,
+        "perMinutes": 1
+      },
+      "newsapi": {
+        "maxRequests": 100,
+        "perDay": 1
+      }
+    }
+  }
+}
+```
+
+### Configure Retry Logic
+
+```json
+{
+  "network": {
+    "retry": {
+      "enabled": true,
+      "maxAttempts": 3,
+      "backoff": "exponential",
+      "initialDelay": 1000,
+      "maxDelay": 10000,
+      "retryOn": [408, 429, 500, 502, 503, 504]
+    }
+  }
+}
+```
+
+**What this does:**
+- Retries on timeout (408), rate limit (429), server errors (5xx)
+- Exponential backoff: 1s, 2s, 4s, 8s...
+- Max 3 attempts
+
+---
+
+## Verification
+
+Test all integrations:
+
+```bash
+# Check network status
+openclaw network status
+
+# Test HTTP client
+openclaw network test-http https://api.github.com
+
+# List configured tools
+openclaw tools list
+
+# Test a specific tool
+openclaw tools test get_weather --city "Paris"
+```
+
+---
+
+## Common Issues
+
+### "API request timeout"
+
+**Increase timeout:**
+
+```json
+{
+  "network": {
+    "http": {
+      "timeout": 60000  // 60 seconds
+    }
+  }
+}
+```
+
+### "Rate limit exceeded"
+
+**Check rate limit status:**
+
+```bash
+openclaw network rate-limits
+```
+
+**Solution:** Wait or upgrade your API plan.
+
+### "Webhook not receiving data"
+
+**Check:**
+1. Webhook server is running: `openclaw status`
+2. Port is accessible: `curl http://localhost:3001/webhook`
+3. Firewall allows traffic
+4. ngrok is running (for testing)
+
+**Debug:**
+
+```bash
+# Enable webhook logging
+openclaw config set webhooks.debug true
+
+# View webhook logs
+openclaw logs webhooks
+```
+
+### "SSL certificate errors"
+
+**For self-signed certificates:**
+
+```json
+{
+  "network": {
+    "http": {
+      "rejectUnauthorized": false  // Not recommended for production
+    }
+  }
+}
+```
+
+---
+
+## Real-World Examples
+
+### 1. **Crypto Price Tracker**
+
+```json
+{
+  "name": "get_crypto_price",
+  "description": "Get cryptocurrency price",
+  "parameters": {
+    "symbol": {
+      "type": "string",
+      "description": "Crypto symbol (BTC, ETH, etc.)"
+    }
+  },
+  "http": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/simple/price",
+    "params": {
+      "ids": "{symbol}",
+      "vs_currencies": "usd"
+    }
+  }
+}
+```
+
+### 2. **GitHub Repository Info**
+
+```json
+{
+  "name": "get_repo_info",
+  "description": "Get GitHub repository information",
+  "parameters": {
+    "repo": {
+      "type": "string",
+      "description": "Repository (owner/repo)"
+    }
+  },
+  "http": {
+    "method": "GET",
+    "url": "https://api.github.com/repos/{repo}",
+    "headers": {
+      "Authorization": "Bearer ${GITHUB_TOKEN}"
+    }
+  }
+}
+```
+
+### 3. **Send Email via SendGrid**
+
+```json
+{
+  "name": "send_email",
+  "description": "Send an email",
+  "parameters": {
+    "to": { "type": "string" },
+    "subject": { "type": "string" },
+    "body": { "type": "string" }
+  },
+  "http": {
+    "method": "POST",
+    "url": "https://api.sendgrid.com/v3/mail/send",
+    "headers": {
+      "Authorization": "Bearer ${SENDGRID_API_KEY}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "personalizations": [{
+        "to": [{"email": "{to}"}]
+      }],
+      "from": {"email": "bot@yourdomain.com"},
+      "subject": "{subject}",
+      "content": [{
+        "type": "text/plain",
+        "value": "{body}"
+      }]
+    }
+  }
+}
+```
+
+---
+
+## Best Practices
+
+1. **Store API keys in `.env`** - Never hardcode secrets
+2. **Use rate limiting** - Protect your API quotas
+3. **Implement retries** - Handle transient failures
+4. **Validate responses** - Check for errors before using data
+5. **Log requests** - Debug issues easily
+6. **Use webhooks** - More efficient than polling
+
+---
+
+## Next Steps
+
+Your agent can now connect to any API! 
+
+**Continue to Module 10:** [Audio & Vision](/learn/audio-vision) to enable voice messages and image processing.
+
+**Need help?** Join the [Discord community](https://discord.com) or check the [API documentation](https://openclaw.army/docs).

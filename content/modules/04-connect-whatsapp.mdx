@@ -1,0 +1,164 @@
+---
+id: "04"
+slug: "connect-whatsapp"
+title: "Connect WhatsApp"
+description: "Link OpenClaw to WhatsApp using QR codes and pairing"
+tier: "free"
+level: 1
+estimatedTime: "15 min"
+---
+
+# Connect WhatsApp
+
+**⚠️ Requirements:**
+- A phone number that can receive SMS
+- WhatsApp app on your phone
+- 10-15 minutes
+
+**Recommended:** Use a separate number, not your personal WhatsApp.
+
+## Step 1: Configure Access Control (IMPORTANT)
+
+Before connecting WhatsApp, you MUST tell OpenClaw who can message you. Otherwise, anyone could message your bot.
+
+Edit the config file:
+
+```bash
+nano ~/.openclaw/openclaw.json
+```
+
+Add this section:
+
+```json
+{
+  "channels": {
+    "whatsapp": {
+      "dmPolicy": "allowlist",
+      "allowFrom": ["+15551234567"]
+    }
+  }
+}
+```
+
+**Format:** Use international format with + and country code.
+
+**Save:** Ctrl+X, then Y, then Enter
+
+## Step 2: Get a Phone Number
+
+You need a real mobile number. WhatsApp blocks most VoIP/virtual numbers.
+
+**Good options:**
+- Local prepaid SIM (any carrier)
+- eSIM: Hetzner (EU), giffgaff (UK), etc.
+- Spare/old phone with active SIM
+
+**Avoid:** Google Voice, TextNow, most "free SMS" services
+
+The number only needs to receive **one SMS** for verification. After that, WhatsApp Web sessions persist.
+
+## Step 3: Start WhatsApp Web Login
+
+```bash
+openclaw channels login
+```
+
+You'll see a QR code in the terminal.
+
+## Step 4: Scan the QR Code
+
+On your phone:
+1. Open WhatsApp
+2. Settings → Linked Devices → Link a Device
+3. Point camera at the QR code in your terminal
+4. Wait for "Linked" confirmation
+
+## Step 5: Test It
+
+Send a message to yourself (WhatsApp "Message yourself" feature).
+
+**If you get a reply:** 🎉 Success!
+
+**If nothing happens:** Check the next section.
+
+## Troubleshooting
+
+### "Not linked" error
+```bash
+openclaw channels status
+```
+Shows `linked: false`
+
+**Fix:** QR expired. Run `openclaw channels login` again.
+
+### "Pairing code required"
+
+This is normal for first contact! OpenClaw uses "pairing" for security.
+
+Check for the code:
+```bash
+openclaw pairing list whatsapp
+```
+
+You'll see something like:
+```
+whatsapp: ABC123 (expires in 45 min)
+```
+
+Approve it:
+```bash
+openclaw pairing approve whatsapp ABC123
+```
+
+Now try messaging again.
+
+### No response at all
+
+Check logs:
+```bash
+openclaw logs --follow
+```
+
+Look for errors.
+
+Common issues:
+- **Wrong number format** → Use +15551234567 format
+- **Not in allowlist** → Check your config
+- **Gateway not running** → `openclaw gateway status`
+
+### Bun runtime error
+
+**CRITICAL:** If you're using Bun, switch to Node.js:
+
+```bash
+# Check which runtime
+which node
+
+# Make sure gateway uses Node
+openclaw gateway --verbose
+```
+
+WhatsApp has known issues with Bun. Use Node.js.
+
+## Using Your Personal Number (Not Recommended)
+
+If you MUST use your personal WhatsApp:
+
+1. Enable self-chat mode in config:
+```json
+{
+  "channels": {
+    "whatsapp": {
+      "selfChatMode": true,
+      "dmPolicy": "allowlist",
+      "allowFrom": ["+15551234567"]
+    }
+  }
+}
+```
+
+2. Use "Message yourself" to avoid spamming contacts
+
+## Next Step
+
+WhatsApp is connected! You can add Telegram too (Module 5), or skip to testing your setup (Module 6).

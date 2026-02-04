@@ -1,0 +1,588 @@
+---
+id: "16"
+slug: "browser-automation"
+title: "Browser Automation"
+description: "Web scraping and browser control for your agent"
+tier: "builder"
+level: 3
+estimatedTime: "50 min"
+---
+
+# Browser Automation
+
+🔒 **Builder Tier Module** - [Upgrade to access](/support)
+
+Give your AI agent the power to browse the web, scrape data, fill forms, and automate browser tasks using Playwright.
+
+## What You'll Learn
+
+- ✅ Set up Playwright for browser automation
+- ✅ Scrape websites and extract data
+- ✅ Automate form submissions
+- ✅ Take screenshots and generate PDFs
+- ✅ Real examples: Price monitoring, Data extraction
+
+## Prerequisites
+
+Complete Module 15 (Custom Tools) before starting this module.
+
+---
+
+## Step 1: Install Playwright
+
+```bash
+# Install Playwright
+npm install -g playwright
+
+# Install browsers
+playwright install chromium firefox webkit
+
+# Verify installation
+playwright --version
+```
+
+### Configure OpenClaw for Browser Automation
+
+```bash
+nano ~/.openclaw/config.json
+```
+
+```json
+{
+  "browser": {
+    "enabled": true,
+    "provider": "playwright",
+    "headless": true,
+    "timeout": 30000,
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "userAgent": "Mozilla/5.0 (compatible; OpenClawBot/1.0)"
+  }
+}
+```
+
+---
+
+## Step 2: Create Web Scraper Tool
+
+### Basic Scraper
+
+```bash
+nano ~/.openclaw/tools/web-scraper.json
+```
+
+```json
+{
+  "name": "scrape_website",
+  "description": "Extract data from websites",
+  "parameters": {
+    "url": {
+      "type": "string",
+      "description": "Website URL to scrape",
+      "required": true
+    },
+    "selector": {
+      "type": "string",
+      "description": "CSS selector for data extraction"
+    },
+    "waitFor": {
+      "type": "string",
+      "description": "Element to wait for before scraping"
+    }
+  },
+  "handler": "web-scraper.js"
+}
+```
+
+### Implement Scraper
+
+```bash
+nano ~/.openclaw/tools/web-scraper.js
+```
+
+```javascript
+const { chromium } = require('playwright');
+
+module.exports = {
+  execute: async ({ url, selector, waitFor }) => {
+    const browser = await chromium.launch({
+      headless: true
+    });
+    
+    try {
+      const page = await browser.newPage();
+      
+      // Navigate to URL
+      await page.goto(url, {
+        waitUntil: 'networkidle'
+      });
+      
+      // Wait for specific element if specified
+      if (waitFor) {
+        await page.waitForSelector(waitFor, {
+          timeout: 10000
+        });
+      }
+      
+      // Extract data
+      let data;
+      if (selector) {
+        data = await page.$$eval(selector, elements => 
+          elements.map(el => ({
+            text: el.textContent.trim(),
+            html: el.innerHTML
+          }))
+        );
+      } else {
+        // Get page title and text if no selector
+        data = {
+          title: await page.title(),
+          text: await page.textContent('body')
+        };
+      }
+      
+      return {
+        success: true,
+        url,
+        data
+      };
+      
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    } finally {
+      await browser.close();
+    }
+  }
+};
+```
+
+---
+
+## Step 3: Price Monitoring Tool
+
+### Create Price Tracker
+
+```bash
+nano ~/.openclaw/tools/price-monitor.js
+```
+
+```javascript
+const { chromium } = require('playwright');
+
+module.exports = {
+  execute: async ({ url, priceSelector, productName }) => {
+    const browser = await chromium.launch({ headless: true });
+    
+    try {
+      const page = await browser.newPage();
+      await page.goto(url);
+      
+      // Wait for price element
+      await page.waitForSelector(priceSelector);
+      
+      // Extract price
+      const priceText = await page.$eval(priceSelector, el => 
+        el.textContent.trim()
+      );
+      
+      // Parse price (remove currency symbols, commas)
+      const price = parseFloat(
+        priceText.replace(/[^0-9.]/g, '')
+      );
+      
+      // Get product image
+      const imageUrl = await page.$eval('img[data-main-image]', 
+        el => el.src
+      ).catch(() => null);
+      
+      return {
+        success: true,
+        product: productName,
+        price,
+        currency: priceText.match(/[$€£]/)?.[0] || 'USD',
+        url,
+        imageUrl,
+        timestamp: new Date().toISOString()
+      };
+      
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    } finally {
+      await browser.close();
+    }
+  }
+};
+```
+
+### Schedule Price Checks
+
+```json
+{
+  "cron": {
+    "jobs": [
+      {
+        "name": "check_prices",
+        "schedule": "0 */6 * * *",  // Every 6 hours
+        "tool": "price_monitor",
+        "params": {
+          "url": "https://example.com/product",
+          "priceSelector": ".price",
+          "productName": "Example Product"
+        },
+        "notify": {
+          "channel": "whatsapp",
+          "condition": "price < 100"
+        }
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Step 4: Form Automation
+
+### Create Form Filler Tool
+
+```bash
+nano ~/.openclaw/tools/form-filler.js
+```
+
+```javascript
+const { chromium } = require('playwright');
+
+module.exports = {
+  execute: async ({ url, formData, submitSelector }) => {
+    const browser = await chromium.launch({ headless: true });
+    
+    try {
+      const page = await browser.newPage();
+      await page.goto(url);
+      
+      // Fill form fields
+      for (const [selector, value] of Object.entries(formData)) {
+        await page.fill(selector, value);
+      }
+      
+      // Submit form
+      if (submitSelector) {
+        await page.click(submitSelector);
+        await page.waitForNavigation();
+      }
+      
+      // Get result
+      const resultUrl = page.url();
+      const resultText = await page.textContent('body');
+      
+      return {
+        success: true,
+        resultUrl,
+        message: resultText.substring(0, 500)
+      };
+      
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    } finally {
+      await browser.close();
+    }
+  }
+};
+```
+
+### Example Usage
+
+```javascript
+// Fill contact form
+await formFiller.execute({
+  url: 'https://example.com/contact',
+  formData: {
+    '#name': 'John Doe',
+    '#email': 'john@example.com',
+    '#message': 'Hello from OpenClaw!'
+  },
+  submitSelector: 'button[type="submit"]'
+});
+```
+
+---
+
+## Step 5: Screenshot & PDF Generation
+
+### Screenshot Tool
+
+```bash
+nano ~/.openclaw/tools/screenshot.js
+```
+
+```javascript
+const { chromium } = require('playwright');
+const path = require('path');
+
+module.exports = {
+  execute: async ({ url, fullPage = false, selector }) => {
+    const browser = await chromium.launch({ headless: true });
+    
+    try {
+      const page = await browser.newPage();
+      await page.goto(url, { waitUntil: 'networkidle' });
+      
+      // Generate filename
+      const filename = `screenshot-${Date.now()}.png`;
+      const filepath = path.join(
+        process.env.OPENCLAW_FILES_DIR,
+        filename
+      );
+      
+      // Take screenshot
+      if (selector) {
+        const element = await page.$(selector);
+        await element.screenshot({ path: filepath });
+      } else {
+        await page.screenshot({
+          path: filepath,
+          fullPage
+        });
+      }
+      
+      return {
+        success: true,
+        filepath,
+        url
+      };
+      
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    } finally {
+      await browser.close();
+    }
+  }
+};
+```
+
+### PDF Generation Tool
+
+```javascript
+module.exports = {
+  execute: async ({ url, format = 'A4' }) => {
+    const browser = await chromium.launch({ headless: true });
+    
+    try {
+      const page = await browser.newPage();
+      await page.goto(url, { waitUntil: 'networkidle' });
+      
+      const filename = `document-${Date.now()}.pdf`;
+      const filepath = path.join(
+        process.env.OPENCLAW_FILES_DIR,
+        filename
+      );
+      
+      await page.pdf({
+        path: filepath,
+        format,
+        printBackground: true
+      });
+      
+      return {
+        success: true,
+        filepath
+      };
+      
+    } finally {
+      await browser.close();
+    }
+  }
+};
+```
+
+---
+
+## Verification
+
+Test browser automation:
+
+```bash
+# Test web scraper
+openclaw tools test scrape_website \
+  --url "https://example.com" \
+  --selector "h1"
+
+# Test price monitor
+openclaw tools test price_monitor \
+  --url "https://amazon.com/product" \
+  --priceSelector ".a-price-whole" \
+  --productName "Test Product"
+
+# Test screenshot
+openclaw tools test screenshot \
+  --url "https://example.com" \
+  --fullPage true
+```
+
+---
+
+## Common Issues
+
+### "Browser not found"
+
+**Install browsers:**
+
+```bash
+playwright install chromium
+```
+
+### "Timeout waiting for selector"
+
+**Increase timeout:**
+
+```javascript
+await page.waitForSelector(selector, {
+  timeout: 30000  // 30 seconds
+});
+```
+
+### "Navigation failed"
+
+**Check if site blocks bots:**
+
+```javascript
+const page = await browser.newPage();
+
+// Set realistic user agent
+await page.setExtraHTTPHeaders({
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+});
+
+// Add delay to seem human
+await page.goto(url);
+await page.waitForTimeout(2000);
+```
+
+---
+
+## Advanced Techniques
+
+### 1. **Handle Dynamic Content**
+
+```javascript
+// Wait for AJAX to complete
+await page.waitForFunction(() => 
+  document.querySelector('.loading') === null
+);
+
+// Wait for network to be idle
+await page.goto(url, {
+  waitUntil: 'networkidle'
+});
+```
+
+### 2. **Bypass Anti-Bot Protection**
+
+```javascript
+const { chromium } = require('playwright-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+
+chromium.use(StealthPlugin());
+
+const browser = await chromium.launch({
+  headless: true,
+  args: ['--disable-blink-features=AutomationControlled']
+});
+```
+
+### 3. **Handle Authentication**
+
+```javascript
+// Login before scraping
+await page.goto('https://example.com/login');
+await page.fill('#username', process.env.SITE_USERNAME);
+await page.fill('#password', process.env.SITE_PASSWORD);
+await page.click('button[type="submit"]');
+await page.waitForNavigation();
+
+// Now scrape authenticated pages
+await page.goto('https://example.com/dashboard');
+```
+
+---
+
+## Real-World Examples
+
+### 1. **Job Board Scraper**
+
+```javascript
+const jobs = await page.$$eval('.job-listing', listings =>
+  listings.map(job => ({
+    title: job.querySelector('.title').textContent,
+    company: job.querySelector('.company').textContent,
+    location: job.querySelector('.location').textContent,
+    salary: job.querySelector('.salary')?.textContent,
+    url: job.querySelector('a').href
+  }))
+);
+```
+
+### 2. **Social Media Monitor**
+
+```javascript
+// Check Twitter mentions
+await page.goto('https://twitter.com/search?q=@yourhandle');
+const tweets = await page.$$eval('[data-testid="tweet"]', tweets =>
+  tweets.slice(0, 10).map(tweet => ({
+    text: tweet.textContent,
+    author: tweet.querySelector('[data-testid="User-Name"]').textContent
+  }))
+);
+```
+
+### 3. **Competitor Price Tracking**
+
+```javascript
+const competitors = [
+  { name: 'Amazon', url: 'https://amazon.com/...', selector: '.price' },
+  { name: 'eBay', url: 'https://ebay.com/...', selector: '.price-display' }
+];
+
+for (const competitor of competitors) {
+  const price = await getPriceFromSite(competitor);
+  if (price < ourPrice) {
+    await notifyPriceAlert(competitor, price);
+  }
+}
+```
+
+---
+
+## Best Practices
+
+1. **Respect robots.txt** - Check if scraping is allowed
+2. **Add delays** - Don't overwhelm servers
+3. **Use headless mode** - Faster and less resource-intensive
+4. **Handle errors gracefully** - Sites change frequently
+5. **Cache results** - Don't scrape the same data repeatedly
+6. **Rotate user agents** - Avoid detection
+7. **Monitor rate limits** - Respect the site's resources
+
+---
+
+## Next Steps
+
+Your agent can now browse the web! 
+
+**Continue to Module 17:** [Complex Workflows](/learn/complex-workflows) to orchestrate multi-step automation and cron jobs.
+
+**Need help?** Contact support or join the [Discord community](https://discord.com).

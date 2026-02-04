@@ -1,0 +1,531 @@
+---
+id: "18"
+slug: "multi-agent-systems"
+title: "Multi-Agent Systems"
+description: "Build coordinated multi-agent deployments"
+tier: "architect"
+level: 4
+estimatedTime: "90 min"
+---
+
+# Multi-Agent Systems
+
+🏗️ **Architect Tier Module** - [Upgrade to access](/support)
+
+Deploy multiple AI agents that work together, share knowledge, and coordinate tasks. Build sophisticated multi-agent architectures for enterprise-scale deployments.
+
+## What You'll Learn
+
+- ✅ Design multi-agent architectures
+- ✅ Implement agent communication patterns
+- ✅ Configure task distribution and load balancing
+- ✅ Set up shared memory systems
+- ✅ Real example: Customer support team of agents
+
+## Prerequisites
+
+Complete Module 17 (Complex Workflows) before starting this module.
+
+---
+
+## Step 1: Multi-Agent Architecture
+
+### Agent Roles
+
+```bash
+nano ~/.openclaw/agents/config.json
+```
+
+```json
+{
+  "agents": [
+    {
+      "id": "coordinator",
+      "role": "coordinator",
+      "model": "claude-3-5-sonnet-20241022",
+      "responsibilities": [
+        "Route incoming requests",
+        "Delegate to specialists",
+        "Aggregate responses"
+      ],
+      "priority": 1
+    },
+    {
+      "id": "support_agent",
+      "role": "specialist",
+      "model": "claude-3-haiku-20240307",
+      "specialization": "customer_support",
+      "responsibilities": [
+        "Answer customer questions",
+        "Resolve issues",
+        "Escalate complex cases"
+      ],
+      "instances": 3  // Run 3 instances
+    },
+    {
+      "id": "technical_agent",
+      "role": "specialist",
+      "model": "claude-3-5-sonnet-20241022",
+      "specialization": "technical_support",
+      "responsibilities": [
+        "Debug technical issues",
+        "Provide code examples",
+        "System diagnostics"
+      ],
+      "instances": 2
+    },
+    {
+      "id": "sales_agent",
+      "role": "specialist",
+      "model": "claude-3-haiku-20240307",
+      "specialization": "sales",
+      "responsibilities": [
+        "Product recommendations",
+        "Pricing information",
+        "Upsell opportunities"
+      ],
+      "instances": 1
+    }
+  ]
+}
+```
+
+---
+
+## Step 2: Agent Communication
+
+### Message Bus Configuration
+
+```json
+{
+  "communication": {
+    "type": "message_bus",
+    "provider": "redis",
+    "channels": {
+      "coordination": "agents:coordination",
+      "tasks": "agents:tasks",
+      "results": "agents:results"
+    },
+    "patterns": {
+      "request_response": true,
+      "publish_subscribe": true,
+      "task_queue": true
+    }
+  }
+}
+```
+
+### Implement Agent Communication
+
+```javascript
+// ~/.openclaw/agents/coordinator.js
+const Redis = require('ioredis');
+const redis = new Redis();
+
+class CoordinatorAgent {
+  async handleRequest(message) {
+    // Analyze request
+    const intent = await this.classifyIntent(message);
+    
+    // Route to appropriate specialist
+    const specialist = this.selectSpecialist(intent);
+    
+    // Publish task
+    await redis.publish('agents:tasks', JSON.stringify({
+      id: generateId(),
+      specialist,
+      message,
+      priority: this.calculatePriority(message)
+    }));
+    
+    // Wait for response
+    const response = await this.waitForResponse();
+    
+    return response;
+  }
+  
+  selectSpecialist(intent) {
+    const routing = {
+      'technical_issue': 'technical_agent',
+      'general_question': 'support_agent',
+      'purchase_inquiry': 'sales_agent'
+    };
+    
+    return routing[intent] || 'support_agent';
+  }
+}
+```
+
+### Specialist Agent
+
+```javascript
+// ~/.openclaw/agents/specialist.js
+class SpecialistAgent {
+  constructor(specialization) {
+    this.specialization = specialization;
+    this.redis = new Redis();
+    this.subscribe();
+  }
+  
+  async subscribe() {
+    await this.redis.subscribe('agents:tasks');
+    
+    this.redis.on('message', async (channel, message) => {
+      const task = JSON.parse(message);
+      
+      // Only handle tasks for this specialist
+      if (task.specialist === this.specialization) {
+        const result = await this.processTask(task);
+        
+        // Publish result
+        await this.redis.publish('agents:results', JSON.stringify({
+          taskId: task.id,
+          result
+        }));
+      }
+    });
+  }
+  
+  async processTask(task) {
+    // Use AI to process the task
+    const response = await this.ai.chat({
+      messages: [
+        {
+          role: 'system',
+          content: `You are a ${this.specialization} specialist.`
+        },
+        {
+          role: 'user',
+          content: task.message
+        }
+      ]
+    });
+    
+    return response;
+  }
+}
+```
+
+---
+
+## Step 3: Load Balancing & Task Distribution
+
+### Round-Robin Load Balancer
+
+```javascript
+class LoadBalancer {
+  constructor(agents) {
+    this.agents = agents;
+    this.currentIndex = 0;
+  }
+  
+  getNextAgent(specialization) {
+    const specialists = this.agents.filter(
+      a => a.specialization === specialization
+    );
+    
+    if (specialists.length === 0) {
+      throw new Error(`No agents for ${specialization}`);
+    }
+    
+    const agent = specialists[this.currentIndex % specialists.length];
+    this.currentIndex++;
+    
+    return agent;
+  }
+}
+```
+
+### Priority Queue
+
+```javascript
+class TaskQueue {
+  constructor() {
+    this.queue = [];
+  }
+  
+  enqueue(task, priority = 0) {
+    this.queue.push({ task, priority });
+    this.queue.sort((a, b) => b.priority - a.priority);
+  }
+  
+  dequeue() {
+    return this.queue.shift()?.task;
+  }
+  
+  async processQueue(agents) {
+    while (this.queue.length > 0) {
+      const task = this.dequeue();
+      const agent = this.selectAvailableAgent(agents);
+      
+      if (agent) {
+        await agent.processTask(task);
+      } else {
+        // No agents available, re-queue
+        this.enqueue(task, task.priority);
+        await this.wait(1000);
+      }
+    }
+  }
+}
+```
+
+---
+
+## Step 4: Shared Memory & Knowledge Base
+
+### Shared Memory Configuration
+
+```json
+{
+  "sharedMemory": {
+    "enabled": true,
+    "provider": "redis",
+    "namespaces": {
+      "customer_data": {
+        "ttl": 86400,  // 24 hours
+        "access": ["support_agent", "sales_agent"]
+      },
+      "technical_kb": {
+        "ttl": -1,  // Permanent
+        "access": ["technical_agent", "coordinator"]
+      },
+      "conversation_history": {
+        "ttl": 3600,  // 1 hour
+        "access": ["*"]  // All agents
+      }
+    }
+  }
+}
+```
+
+### Implement Shared Knowledge
+
+```javascript
+class SharedKnowledge {
+  constructor() {
+    this.redis = new Redis();
+  }
+  
+  async store(namespace, key, value, ttl) {
+    const fullKey = `${namespace}:${key}`;
+    await this.redis.set(fullKey, JSON.stringify(value));
+    
+    if (ttl > 0) {
+      await this.redis.expire(fullKey, ttl);
+    }
+  }
+  
+  async retrieve(namespace, key) {
+    const fullKey = `${namespace}:${key}`;
+    const value = await this.redis.get(fullKey);
+    return value ? JSON.parse(value) : null;
+  }
+  
+  async search(namespace, pattern) {
+    const keys = await this.redis.keys(`${namespace}:${pattern}`);
+    const values = await Promise.all(
+      keys.map(k => this.redis.get(k))
+    );
+    return values.map(v => JSON.parse(v));
+  }
+}
+```
+
+---
+
+## Step 5: Real-World Example - Customer Support Team
+
+### Complete Multi-Agent System
+
+```javascript
+// Main orchestrator
+class CustomerSupportSystem {
+  constructor() {
+    this.coordinator = new CoordinatorAgent();
+    this.supportAgents = Array(3).fill(null).map(
+      () => new SpecialistAgent('support')
+    );
+    this.technicalAgents = Array(2).fill(null).map(
+      () => new SpecialistAgent('technical')
+    );
+    this.salesAgent = new SpecialistAgent('sales');
+    this.loadBalancer = new LoadBalancer([
+      ...this.supportAgents,
+      ...this.technicalAgents,
+      this.salesAgent
+    ]);
+    this.sharedKnowledge = new SharedKnowledge();
+  }
+  
+  async handleCustomerMessage(customerId, message) {
+    // Store in conversation history
+    await this.sharedKnowledge.store(
+      'conversation_history',
+      customerId,
+      { message, timestamp: Date.now() }
+    );
+    
+    // Coordinator classifies and routes
+    const intent = await this.coordinator.classifyIntent(message);
+    const specialist = this.loadBalancer.getNextAgent(intent);
+    
+    // Specialist processes with access to shared knowledge
+    const customerData = await this.sharedKnowledge.retrieve(
+      'customer_data',
+      customerId
+    );
+    
+    const response = await specialist.processTask({
+      message,
+      customerData,
+      intent
+    });
+    
+    // Store response
+    await this.sharedKnowledge.store(
+      'conversation_history',
+      `${customerId}:response`,
+      { response, timestamp: Date.now() }
+    );
+    
+    return response;
+  }
+}
+```
+
+---
+
+## Verification
+
+Test multi-agent system:
+
+```bash
+# Start all agents
+openclaw agents start --all
+
+# Check agent status
+openclaw agents status
+
+# Should show:
+# coordinator: Running (1 instance)
+# support_agent: Running (3 instances)
+# technical_agent: Running (2 instances)
+# sales_agent: Running (1 instance)
+
+# Test coordination
+openclaw agents test --message "I need help with deployment"
+
+# Monitor agent communication
+openclaw agents monitor --verbose
+```
+
+---
+
+## Common Issues
+
+### "Agents not communicating"
+
+**Check Redis:**
+
+```bash
+redis-cli ping
+
+# Monitor messages
+redis-cli MONITOR
+```
+
+### "Load imbalance"
+
+**Check agent metrics:**
+
+```bash
+openclaw agents metrics
+
+# Adjust instance counts
+openclaw agents scale support_agent --instances 5
+```
+
+### "Memory conflicts"
+
+**Check namespace access:**
+
+```bash
+openclaw agents permissions list
+```
+
+---
+
+## Advanced Patterns
+
+### 1. **Hierarchical Agents**
+
+```
+CEO Agent (Strategic decisions)
+  ├── Manager Agent (Task coordination)
+  │   ├── Worker Agent 1
+  │   ├── Worker Agent 2
+  │   └── Worker Agent 3
+  └── Specialist Agent (Expert tasks)
+```
+
+### 2. **Swarm Intelligence**
+
+```javascript
+// Agents collaborate to solve complex problems
+class SwarmAgent {
+  async collaborate(problem) {
+    // Share findings with swarm
+    await this.broadcast('finding', this.analyze(problem));
+    
+    // Collect insights from other agents
+    const insights = await this.collectInsights();
+    
+    // Synthesize solution
+    return this.synthesize(insights);
+  }
+}
+```
+
+### 3. **Consensus Mechanism**
+
+```javascript
+// Multiple agents vote on decisions
+async function getConsensus(agents, question) {
+  const responses = await Promise.all(
+    agents.map(a => a.answer(question))
+  );
+  
+  // Majority vote
+  const votes = {};
+  responses.forEach(r => {
+    votes[r] = (votes[r] || 0) + 1;
+  });
+  
+  return Object.keys(votes).reduce((a, b) => 
+    votes[a] > votes[b] ? a : b
+  );
+}
+```
+
+---
+
+## Best Practices
+
+1. **Clear role separation** - Each agent has specific responsibilities
+2. **Efficient communication** - Use message bus, not polling
+3. **Shared knowledge** - Avoid duplicate data fetching
+4. **Load balancing** - Distribute work evenly
+5. **Monitoring** - Track agent performance
+6. **Graceful degradation** - Handle agent failures
+7. **Cost optimization** - Use cheaper models where possible
+
+---
+
+## Next Steps
+
+Your multi-agent system is ready! 
+
+**Continue to Module 19:** [Plugin Development](/learn/plugin-development) to create reusable plugins and extensions.
+
+**Need help?** Contact support or join the [Discord community](https://discord.com).

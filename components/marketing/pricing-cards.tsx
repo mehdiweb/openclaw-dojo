@@ -150,14 +150,15 @@ export function PricingCards() {
                             </ul>
 
                             {/* CTA Button */}
-                            <Button
-                                variant={tier.highlighted ? "primary" : "outline"}
-                                size="md"
-                                className="w-full"
-                                asChild
-                            >
-                                <Link href={tier.ctaLink}>{tier.cta}</Link>
-                            </Button>
+                            <Link href={tier.ctaLink} className="w-full">
+                                <Button
+                                    variant={tier.highlighted ? "primary" : "secondary"}
+                                    size="md"
+                                    className="w-full"
+                                >
+                                    {tier.cta}
+                                </Button>
+                            </Link>
 
                             {/* Extra note for locked tiers */}
                             {tier.locked && (

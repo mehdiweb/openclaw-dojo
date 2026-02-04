@@ -34,24 +34,24 @@ export function CoffeeCTA() {
 
                         {/* Support tiers */}
                         <div className="mt-8 flex flex-wrap gap-4">
-                            <Button variant="ghost" size="lg" asChild>
-                                <Link href="/support" className="flex items-center gap-2">
-                                    <Coffee className="h-4 w-4" />
+                            <Link href="/support">
+                                <Button variant="ghost" size="lg">
+                                    <Coffee className="h-4 w-4 mr-2" />
                                     $3 Coffee
-                                </Link>
-                            </Button>
-                            <Button variant="coffee" size="lg" asChild>
-                                <Link href="/support" className="flex items-center gap-2">
-                                    <Gift className="h-4 w-4" />
+                                </Button>
+                            </Link>
+                            <Link href="/support">
+                                <Button variant="coffee" size="lg">
+                                    <Gift className="h-4 w-4 mr-2" />
                                     $5 Large Coffee
-                                </Link>
-                            </Button>
-                            <Button variant="primary" size="lg" asChild>
-                                <Link href="/support" className="flex items-center gap-2">
-                                    <Heart className="h-4 w-4" />
+                                </Button>
+                            </Link>
+                            <Link href="/support">
+                                <Button variant="primary" size="lg">
+                                    <Heart className="h-4 w-4 mr-2" />
                                     $10 Coffee + Snack
-                                </Link>
-                            </Button>
+                                </Button>
+                            </Link>
                         </div>
 
                         <p className="mt-4 text-sm text-text-muted">
